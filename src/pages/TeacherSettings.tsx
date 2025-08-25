@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../components/ui/switch';
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { 
@@ -27,8 +27,6 @@ import {
   User, 
   Mail, 
   Phone, 
-  School, 
-  IdCard, 
   Lock, 
   Bell, 
   Palette, 
@@ -36,7 +34,6 @@ import {
   Download,
   Upload,
   Shield,
-  Smartphone,
   CheckCircle,
   AlertTriangle,
   Save,
@@ -51,9 +48,6 @@ interface ProfileData {
   lastName: string;
   email: string;
   phoneNumber: string;
-  school: string;
-  employeeId: string;
-  subjects: string[];
   bio: string;
   profilePicture?: string;
 }
@@ -68,33 +62,20 @@ interface SecuritySettings {
 
 interface NotificationSettings {
   emailNotifications: boolean;
-  pushNotifications: boolean;
   documentShared: boolean;
   documentComments: boolean;
-  systemUpdates: boolean;
   weeklyDigest: boolean;
-}
-
-interface AppearanceSettings {
-  theme: 'light' | 'dark' | 'system';
-  language: string;
-  timezone: string;
-  dateFormat: string;
 }
 
 export default function TeacherSettings() {
   const { user, updateUser } = useAuth();
-  const { theme, setTheme } = useTheme();
   
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
     phoneNumber: '+254 712 345 678',
-    school: 'Nairobi Primary School',
-    employeeId: 'TSC/12345/2023',
-    subjects: ['Mathematics', 'Science'],
-    bio: 'Passionate educator with 8 years of experience in primary education. Specialized in Mathematics and Science curriculum development.',
+    bio: 'Passionate educator with 8 years of experience in primary education.',
   });
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
@@ -107,25 +88,15 @@ export default function TeacherSettings() {
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     emailNotifications: true,
-    pushNotifications: true,
     documentShared: true,
     documentComments: false,
-    systemUpdates: true,
     weeklyDigest: true,
-  });
-
-  const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
-    theme: theme,
-    language: 'en',
-    timezone: 'Africa/Nairobi',
-    dateFormat: 'dd/mm/yyyy',
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [saveError, setSaveError] = useState('');
-  const [deleteAccountDialog, setDeleteAccountDialog] = useState(false);
 
   const handleProfileSave = async () => {
     try {
@@ -187,27 +158,29 @@ export default function TeacherSettings() {
     });
   };
 
-  const handleAppearanceSave = () => {
-    setTheme(appearanceSettings.theme);
-    // In real app, this would save via Django REST API
-    console.log('Appearance settings saved:', appearanceSettings);
-    toast.success('Settings Saved', {
-      description: 'Your appearance preferences have been updated'
-    });
+  const handleChangePhoto = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        // In real app, this would upload to server
+        const imageUrl = URL.createObjectURL(file);
+        setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
+        toast.success('Photo Updated', {
+          description: 'Profile photo has been updated successfully'
+        });
+      }
+    };
+    input.click();
   };
 
-  const handleExportData = () => {
-    // In real app, this would trigger data export
-    console.log('Exporting user data...');
-    toast.success('Export Started', {
-      description: 'Data export initiated. You will receive an email when ready.'
+  const handleRemovePhoto = () => {
+    setProfileData(prev => ({ ...prev, profilePicture: undefined }));
+    toast.success('Photo Removed', {
+      description: 'Profile photo has been removed successfully'
     });
-  };
-
-  const handleDeleteAccount = () => {
-    // In real app, this would delete account via Django REST API
-    console.log('Account deletion requested');
-    setDeleteAccountDialog(false);
   };
 
   return (
@@ -242,11 +215,10 @@ export default function TeacherSettings() {
 
         {/* Settings Tabs */}
         <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
@@ -265,17 +237,20 @@ export default function TeacherSettings() {
                 {/* Profile Picture */}
                 <div className="flex items-center gap-6">
                   <Avatar className="h-20 w-20">
+                    {profileData.profilePicture && (
+                      <AvatarImage src={profileData.profilePicture} alt="Profile" />
+                    )}
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
                       {profileData.firstName[0]}{profileData.lastName[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={handleChangePhoto}>
                         <Camera className="h-4 w-4 mr-2" />
                         Change Photo
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={handleRemovePhoto}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         Remove
                       </Button>
@@ -334,49 +309,7 @@ export default function TeacherSettings() {
                 {/* Professional Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Professional Details</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="school">School/Institution</Label>
-                      <div className="relative">
-                        <School className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="school"
-                          value={profileData.school}
-                          onChange={(e) => setProfileData(prev => ({ ...prev, school: e.target.value }))}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="employeeId">TSC Number</Label>
-                      <div className="relative">
-                        <IdCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="employeeId"
-                          value={profileData.employeeId}
-                          onChange={(e) => setProfileData(prev => ({ ...prev, employeeId: e.target.value }))}
-                          className="pl-10"
-                          disabled
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Teaching Subjects</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {profileData.subjects.map((subject, index) => (
-                        <Badge key={index} variant="secondary">
-                          {subject}
-                        </Badge>
-                      ))}
-                      <Button variant="outline" size="sm">
-                        <User className="h-4 w-4 mr-2" />
-                        Edit Subjects
-                      </Button>
-                    </div>
-                  </div>
-
+                  
                   <div className="space-y-2">
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea
@@ -539,7 +472,7 @@ export default function TeacherSettings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* General Notifications */}
+                {/* Document Notifications */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">General</h3>
                   <div className="space-y-4">
@@ -555,22 +488,10 @@ export default function TeacherSettings() {
                         onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, emailNotifications: checked }))}
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium">Push Notifications</p>
-                        <p className="text-sm text-muted-foreground">
-                          Receive push notifications in your browser
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.pushNotifications}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, pushNotifications: checked }))}
-                      />
-                    </div>
                   </div>
                 </div>
 
-                {/* Document Notifications */}
+                {/* Document Activities */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Document Activities</h3>
                   <div className="space-y-4">
@@ -598,25 +519,6 @@ export default function TeacherSettings() {
                         onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, documentComments: checked }))}
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* System Notifications */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">System Updates</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium">System Updates</p>
-                        <p className="text-sm text-muted-foreground">
-                          Important system updates and maintenance notices
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.systemUpdates}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, systemUpdates: checked }))}
-                      />
-                    </div>
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <p className="font-medium">Weekly Digest</p>
@@ -636,156 +538,6 @@ export default function TeacherSettings() {
                   <Save className="h-4 w-4 mr-2" />
                   Save Preferences
                 </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Appearance Tab */}
-          <TabsContent value="appearance" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="h-5 w-5" />
-                  Appearance & Language
-                </CardTitle>
-                <CardDescription>
-                  Customize the look and feel of the application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Theme */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Theme</h3>
-                  <Select
-                    value={appearanceSettings.theme}
-                    onValueChange={(value: 'light' | 'dark' | 'system') => setAppearanceSettings(prev => ({ ...prev, theme: value }))}
-                  >
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="system">System</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Language */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Language</h3>
-                  <Select
-                    value={appearanceSettings.language}
-                    onValueChange={(value) => setAppearanceSettings(prev => ({ ...prev, language: value }))}
-                  >
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="sw">Kiswahili</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Timezone */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Timezone</h3>
-                  <Select
-                    value={appearanceSettings.timezone}
-                    onValueChange={(value) => setAppearanceSettings(prev => ({ ...prev, timezone: value }))}
-                  >
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Africa/Nairobi">Nairobi (EAT)</SelectItem>
-                      <SelectItem value="UTC">UTC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Date Format */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Date Format</h3>
-                  <Select
-                    value={appearanceSettings.dateFormat}
-                    onValueChange={(value) => setAppearanceSettings(prev => ({ ...prev, dateFormat: value }))}
-                  >
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dd/mm/yyyy">DD/MM/YYYY</SelectItem>
-                      <SelectItem value="mm/dd/yyyy">MM/DD/YYYY</SelectItem>
-                      <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button onClick={handleAppearanceSave}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Data Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Data Management</CardTitle>
-                <CardDescription>
-                  Export your data or delete your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="font-medium">Export Data</p>
-                    <p className="text-sm text-muted-foreground">
-                      Download a copy of all your data
-                    </p>
-                  </div>
-                  <Button variant="outline" onClick={handleExportData}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="font-medium text-destructive">Delete Account</p>
-                    <p className="text-sm text-muted-foreground">
-                      Permanently delete your account and all data
-                    </p>
-                  </div>
-                  <Dialog open={deleteAccountDialog} onOpenChange={setDeleteAccountDialog}>
-                    <DialogTrigger asChild>
-                      <Button variant="destructive">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Delete Account</DialogTitle>
-                        <DialogDescription>
-                          Are you sure you want to delete your account? This action cannot be undone.
-                          All your documents and data will be permanently removed.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeleteAccountDialog(false)}>
-                          Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={handleDeleteAccount}>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Account
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
