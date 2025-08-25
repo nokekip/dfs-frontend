@@ -411,9 +411,9 @@ export default function AdminTeachers() {
               {filteredTeachers.map((teacher) => (
                 <div
                   key={teacher.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary/10 text-primary">
                         {teacher.firstName[0]}{teacher.lastName[0]}
@@ -443,7 +443,7 @@ export default function AdminTeachers() {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           <span>Joined {formatDate(teacher.joinDate)}</span>
@@ -455,17 +455,16 @@ export default function AdminTeachers() {
                           </div>
                         )}
                       </div>
-                      
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
                     {teacher.status === 'pending' && (
-                      <>
+                      <div className="flex flex-wrap gap-2 w-full lg:w-auto">
                         <Button 
                           size="sm" 
                           onClick={() => handleApproveTeacher(teacher)}
-                          className="bg-success hover:bg-success/90"
+                          className="bg-success hover:bg-success/90 flex-1 lg:flex-initial"
                         >
                           <UserCheck className="h-4 w-4 mr-1" />
                           Approve
@@ -474,11 +473,12 @@ export default function AdminTeachers() {
                           size="sm" 
                           variant="destructive"
                           onClick={() => handleRejectTeacher(teacher)}
+                          className="flex-1 lg:flex-initial"
                         >
                           <UserX className="h-4 w-4 mr-1" />
                           Reject
                         </Button>
-                      </>
+                      </div>
                     )}
                     
                     <DropdownMenu>
