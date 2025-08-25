@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTeachers } from '../hooks/useTeachers';
+import { useCategories } from '../hooks/useCategories';
+import { useDashboard } from '../hooks/useDashboard';
 import Layout from '../components/Layout';
+import { Loading } from '../components/Loading';
+import { ErrorMessage } from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -31,18 +36,7 @@ import {
   Download,
   BarChart3
 } from 'lucide-react';
-
-interface Teacher {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  school: string;
-  employeeId: string;
-  status: 'active' | 'pending' | 'suspended';
-  joinDate: string;
-  filesCount: number;
-}
+import type { Teacher, DocumentCategory } from '../services/types';
 
 interface ActivityLog {
   id: string;
@@ -52,25 +46,67 @@ interface ActivityLog {
   timestamp: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  requiresClassSubject: boolean;
-  documentsCount: number;
-}
-
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const { 
+    teachers, 
+    isLoading: teachersLoading, 
+    error: teachersError, 
+    approveTeacher, 
+    fetchTeachers 
+  } = useTeachers();
+  const { 
+    categories, 
+    isLoading: categoriesLoading, 
+    error: categoriesError, 
+    fetchCategories 
+  } = useCategories();
+  const { 
+    stats, 
+    isLoading: statsLoading, 
+    error: statsError, 
+    fetchDashboardStats 
+  } = useDashboard('admin');
+
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   
   // Dialog states
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | null>(null);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [editCategoryDialogOpen, setEditCategoryDialogOpen] = useState(false);
   const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchTeachers();
+    fetchCategories();
+    fetchDashboardStats();
+    
+    // Mock recent activity - in real app, this would come from API
+    setRecentActivity([
+      {
+        id: '1',
+        teacherName: 'Jane Doe',
+        action: 'upload',
+        fileName: 'Mathematics Lesson Plan.pdf',
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      },
+      {
+        id: '2',
+        teacherName: 'John Smith',
+        action: 'share',
+        fileName: 'Science Assessment.docx',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+      },
+      {
+        id: '3',
+        teacherName: 'Mary Johnson',
+        action: 'login',
+        timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+      },
+    ]);
+  }, [fetchTeachers, fetchCategories, fetchDashboardStats]);
 
   const handleViewReports = () => {
     window.location.href = '/admin/reports';
@@ -94,22 +130,40 @@ export default function AdminDashboard() {
     setApproveDialogOpen(true);
   };
 
-  const confirmApproval = () => {
+  const confirmApproval = async () => {
     if (selectedTeacher) {
-      setTeachers(prev => 
-        prev.map(teacher => 
-          teacher.id === selectedTeacher.id 
-            ? { ...teacher, status: 'active' as const }
-            : teacher
-        )
-      );
-      setApproveDialogOpen(false);
-      setSelectedTeacher(null);
-      console.log(`Approved teacher: ${selectedTeacher.firstName} ${selectedTeacher.lastName}`);
+      try {
+        await approveTeacher(selectedTeacher.id, true);
+        fetchTeachers(); // Refresh list
+        setApproveDialogOpen(false);
+        setSelectedTeacher(null);
+      } catch (error) {
+        console.error('Failed to approve teacher:', error);
+      }
     }
   };
 
-  const handleEditCategory = (category: Category) => {
+  // Loading state
+  if (teachersLoading || categoriesLoading || statsLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loading text="Loading admin dashboard..." />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Error state
+  if (teachersError || categoriesError || statsError) {
+    return (
+      <Layout>
+        <ErrorMessage message={teachersError || categoriesError || statsError || 'Unknown error'} />
+      </Layout>
+    );
+  }
+
+  const handleEditCategory = (category: DocumentCategory) => {
     setSelectedCategory(category);
     setEditCategoryDialogOpen(true);
   };
@@ -123,7 +177,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteCategory = (category: Category) => {
+  const handleDeleteCategory = (category: DocumentCategory) => {
     setSelectedCategory(category);
     setDeleteCategoryDialogOpen(true);
   };
@@ -138,96 +192,12 @@ export default function AdminDashboard() {
       return;
     }
     
-    setCategories(prev => prev.filter(category => category.id !== selectedCategory.id));
+    // In real app, this would call deleteCategory API
+    console.log(`Deleted category: ${selectedCategory.name}`);
     setDeleteCategoryDialogOpen(false);
     setSelectedCategory(null);
-    console.log(`Deleted category: ${selectedCategory.name}`);
+    fetchCategories(); // Refresh list
   };
-
-  // Mock data - in real app, this would come from Django REST API
-  useEffect(() => {
-    setTeachers([
-      {
-        id: '1',
-        firstName: 'Jane',
-        lastName: 'Mwangi',
-        email: 'jane.mwangi@school.co.ke',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12345/2023',
-        status: 'active',
-        joinDate: '2024-01-15',
-        filesCount: 24
-      },
-      {
-        id: '2',
-        firstName: 'John',
-        lastName: 'Kiprotich',
-        email: 'john.kiprotich@school.co.ke',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12346/2023',
-        status: 'active',
-        joinDate: '2024-01-10',
-        filesCount: 18
-      },
-      {
-        id: '3',
-        firstName: 'Mary',
-        lastName: 'Ochieng',
-        email: 'mary.ochieng@school.co.ke',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12347/2023',
-        status: 'pending',
-        joinDate: '2024-01-20',
-        filesCount: 0
-      }
-    ]);
-
-    setRecentActivity([
-      {
-        id: '1',
-        teacherName: 'Jane Mwangi',
-        action: 'upload',
-        fileName: 'Mathematics Lesson Plan - Week 5',
-        timestamp: '2024-01-15T10:30:00Z'
-      },
-      {
-        id: '2',
-        teacherName: 'John Kiprotich',
-        action: 'share',
-        fileName: 'Science Assessment Template',
-        timestamp: '2024-01-15T09:15:00Z'
-      },
-      {
-        id: '3',
-        teacherName: 'Jane Mwangi',
-        action: 'login',
-        timestamp: '2024-01-15T08:00:00Z'
-      },
-      {
-        id: '4',
-        teacherName: 'John Kiprotich',
-        action: 'upload',
-        fileName: 'Student Progress Report',
-        timestamp: '2024-01-14T16:45:00Z'
-      },
-      {
-        id: '5',
-        teacherName: 'Jane Mwangi',
-        action: 'delete',
-        fileName: 'Old Lesson Plan Draft',
-        timestamp: '2024-01-14T14:20:00Z'
-      }
-    ]);
-
-    setCategories([
-      { id: '1', name: 'Lesson Plans', requiresClassSubject: true, documentsCount: 45 },
-      { id: '2', name: 'Assessment Reports', requiresClassSubject: true, documentsCount: 32 },
-      { id: '3', name: 'Student Records', requiresClassSubject: true, documentsCount: 28 },
-      { id: '4', name: 'Administrative Forms', requiresClassSubject: false, documentsCount: 15 },
-      { id: '5', name: 'Professional Development', requiresClassSubject: false, documentsCount: 12 },
-      { id: '6', name: 'Meeting Minutes', requiresClassSubject: false, documentsCount: 8 }
-    ]);
-  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -289,12 +259,6 @@ export default function AdminDashboard() {
     });
   };
 
-  const activeTeachers = teachers.filter(t => t.status === 'active').length;
-  const pendingTeachers = teachers.filter(t => t.status === 'pending').length;
-  const totalFiles = teachers.reduce((sum, teacher) => sum + teacher.filesCount, 0);
-  const totalCategories = categories.length;
-  const sharedFilesCount = 8; // Mock data
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -316,9 +280,9 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{teachers.length}</div>
+              <div className="text-2xl font-bold">{(stats as any)?.totalTeachers || 0}</div>
               <p className="text-xs text-muted-foreground">
-                {activeTeachers} active, {pendingTeachers} pending
+                {(stats as any)?.activeTeachers || 0} active, {(stats as any)?.pendingTeachers || 0} pending
               </p>
             </CardContent>
           </Card>
@@ -329,7 +293,7 @@ export default function AdminDashboard() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalFiles}</div>
+              <div className="text-2xl font-bold">{(stats as any)?.totalDocuments || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Across all teachers
               </p>
@@ -342,7 +306,7 @@ export default function AdminDashboard() {
               <FolderOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalCategories}</div>
+              <div className="text-2xl font-bold">{(stats as any)?.totalCategories || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Document categories
               </p>
@@ -355,7 +319,7 @@ export default function AdminDashboard() {
               <Share className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{sharedFilesCount}</div>
+              <div className="text-2xl font-bold">{(stats as any)?.sharedDocuments || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Currently shared
               </p>
@@ -421,17 +385,17 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                          {teacher.firstName[0]}{teacher.lastName[0]}
+                          {teacher.user.firstName[0]}{teacher.user.lastName[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium">
-                          {teacher.firstName} {teacher.lastName}
+                          {teacher.user.firstName} {teacher.user.lastName}
                         </p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{teacher.filesCount} files</span>
+                          <span>{teacher.documentsCount} files</span>
                           <span>•</span>
-                          <span>Joined {formatDate(teacher.joinDate)}</span>
+                          <span>Joined {formatDate(teacher.createdAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -545,7 +509,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Approve Teacher Account</DialogTitle>
             <DialogDescription>
-              Are you sure you want to approve the account for {selectedTeacher?.firstName} {selectedTeacher?.lastName}? 
+              Are you sure you want to approve the account for {selectedTeacher?.user.firstName} {selectedTeacher?.user.lastName}? 
               They will gain full access to the system.
             </DialogDescription>
           </DialogHeader>

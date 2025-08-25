@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDashboard } from '../hooks/useDashboard';
 import Layout from '../components/Layout';
+import { Loading } from '../components/Loading';
+import { ErrorMessage } from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -27,36 +30,53 @@ import {
 } from 'lucide-react';
 
 export default function Profile() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, isLoading } = useAuth();
+  const { stats, isLoading: statsLoading, error: statsError, fetchDashboardStats } = useDashboard(user?.role || 'teacher');
   
   const [profileData, setProfileData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    phoneNumber: '+254 712 345 678',
-    bio: user?.role === 'admin' 
-      ? 'System administrator responsible for managing the digital filing system and supporting teachers.'
-      : 'Passionate educator with 8 years of experience in primary education.',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    bio: '',
     profilePicture: undefined as string | undefined
   });
 
-  const [activityStats] = useState({
-    documentsUploaded: user?.role === 'admin' ? 0 : 24,
-    documentsShared: user?.role === 'admin' ? 0 : 8,
-    totalDownloads: user?.role === 'admin' ? 0 : 156,
-    joinDate: '2024-01-15',
-    lastLogin: '2024-01-20T10:30:00Z',
-    totalTeachers: user?.role === 'admin' ? 45 : 0,
-    totalCategories: user?.role === 'admin' ? 8 : 0
-  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize profile data when user loads
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phoneNumber: '',
+        bio: (user.role === 'admin' 
+          ? 'System administrator responsible for managing the digital filing system and supporting teachers.'
+          : 'Passionate educator dedicated to providing quality education.'),
+        profilePicture: user.profilePicture
+      });
+    }
+  }, [user]);
+
+  // Fetch dashboard stats on component mount
+  useEffect(() => {
+    fetchDashboardStats();
+  }, [fetchDashboardStats]);
 
   const handleSave = async () => {
+    if (!user) return;
+    
     try {
-      // In real app, this would update via Django REST API
-      updateUser({
+      setIsSaving(true);
+      
+      // Update user profile via the auth hook
+      await updateUser({
         firstName: profileData.firstName,
         lastName: profileData.lastName,
         email: profileData.email,
+        profilePicture: profileData.profilePicture,
       });
       
       toast.success('Profile Updated', {
@@ -66,6 +86,8 @@ export default function Profile() {
       toast.error('Update Failed', {
         description: 'Failed to update profile. Please try again.'
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -111,6 +133,26 @@ export default function Profile() {
       minute: '2-digit'
     });
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loading text="Loading profile..." />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Error state for stats
+  if (statsError) {
+    return (
+      <Layout>
+        <ErrorMessage message={statsError} />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -228,9 +270,18 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <Button onClick={handleSave} className="w-full md:w-auto">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Profile
+                <Button onClick={handleSave} className="w-full md:w-auto" disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loading size="sm" className="mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Profile
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -268,11 +319,11 @@ export default function Profile() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>Joined {formatDate(activityStats.joinDate)}</span>
+                    <span>Joined {formatDate(user?.dateJoined || new Date().toISOString())}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>Last login {formatDateTime(activityStats.lastLogin)}</span>
+                    <span>Last login {formatDateTime(user?.lastLogin || new Date().toISOString())}</span>
                   </div>
                 </div>
               </CardContent>
@@ -287,15 +338,25 @@ export default function Profile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {user?.role === 'admin' ? (
+                {statsLoading ? (
+                  <div className="space-y-4">
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
+                  </div>
+                ) : user?.role === 'admin' ? (
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Total Teachers</span>
-                      <span className="text-2xl font-bold">{activityStats.totalTeachers}</span>
+                      <span className="text-2xl font-bold">{(stats as any)?.totalTeachers || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Categories</span>
-                      <span className="text-2xl font-bold">{activityStats.totalCategories}</span>
+                      <span className="text-2xl font-bold">{(stats as any)?.totalCategories || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Total Documents</span>
+                      <span className="text-2xl font-bold">{(stats as any)?.totalDocuments || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">System Health</span>
@@ -308,15 +369,15 @@ export default function Profile() {
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Documents Uploaded</span>
-                      <span className="text-2xl font-bold">{activityStats.documentsUploaded}</span>
+                      <span className="text-2xl font-bold">{(stats as any)?.documentsUploaded || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Files Shared</span>
-                      <span className="text-2xl font-bold">{activityStats.documentsShared}</span>
+                      <span className="text-2xl font-bold">{(stats as any)?.documentsShared || 0}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Total Downloads</span>
-                      <span className="text-2xl font-bold">{activityStats.totalDownloads}</span>
+                      <span className="text-2xl font-bold">{(stats as any)?.totalDownloads || 0}</span>
                     </div>
                   </>
                 )}

@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDocuments } from '../hooks/useDocuments';
+import { useCategories } from '../hooks/useCategories';
+import { useDashboard } from '../hooks/useDashboard';
 import Layout from '../components/Layout';
+import { Loading } from '../components/Loading';
+import { ErrorMessage } from '../components/ErrorBoundary';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -25,28 +30,32 @@ import {
   AlertCircle,
   Plus
 } from 'lucide-react';
-
-interface DocumentFile {
-  id: string;
-  title: string;
-  fileName: string;
-  category: string;
-  class?: string;
-  subject?: string;
-  uploadDate: string;
-  fileSize: string;
-  fileType: string;
-  isShared: boolean;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  requiresClassSubject: boolean;
-}
+import type { DocumentCategory } from '../services/types';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
+  const { 
+    documents, 
+    isLoading: documentsLoading, 
+    error: documentsError, 
+    uploadDocument, 
+    deleteDocument,
+    shareDocument,
+    fetchDocuments 
+  } = useDocuments();
+  const { 
+    categories, 
+    isLoading: categoriesLoading, 
+    error: categoriesError, 
+    fetchCategories 
+  } = useCategories();
+  const { 
+    stats, 
+    isLoading: statsLoading, 
+    error: statsError, 
+    fetchDashboardStats 
+  } = useDashboard('teacher');
+
   const [uploadForm, setUploadForm] = useState({
     title: '',
     file: null as File | null,
@@ -54,87 +63,17 @@ export default function TeacherDashboard() {
     class: '',
     subject: ''
   });
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [recentFiles, setRecentFiles] = useState<DocumentFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  // Mock data - in real app, this would come from Django REST API
+  // Fetch data on component mount
   useEffect(() => {
-    // Simulate API calls
-    setCategories([
-      { id: '1', name: 'Lesson Plans', requiresClassSubject: true },
-      { id: '2', name: 'Assessment Reports', requiresClassSubject: true },
-      { id: '3', name: 'Student Records', requiresClassSubject: true },
-      { id: '4', name: 'Administrative Forms', requiresClassSubject: false },
-      { id: '5', name: 'Professional Development', requiresClassSubject: false },
-      { id: '6', name: 'Meeting Minutes', requiresClassSubject: false }
-    ]);
-
-    setRecentFiles([
-      {
-        id: '1',
-        title: 'Mathematics Lesson Plan - Week 5',
-        fileName: 'math_lesson_week5.pdf',
-        category: 'Lesson Plans',
-        class: 'Grade 5',
-        subject: 'Mathematics',
-        uploadDate: '2024-01-15',
-        fileSize: '2.3 MB',
-        fileType: 'PDF',
-        isShared: false
-      },
-      {
-        id: '2',
-        title: 'Science Assessment Report',
-        fileName: 'science_assessment_q1.docx',
-        category: 'Assessment Reports',
-        class: 'Grade 6',
-        subject: 'Science',
-        uploadDate: '2024-01-14',
-        fileSize: '1.8 MB',
-        fileType: 'DOCX',
-        isShared: true
-      },
-      {
-        id: '3',
-        title: 'Staff Meeting Minutes - January',
-        fileName: 'staff_meeting_jan2024.pdf',
-        category: 'Meeting Minutes',
-        uploadDate: '2024-01-12',
-        fileSize: '956 KB',
-        fileType: 'PDF',
-        isShared: false
-      },
-      {
-        id: '4',
-        title: 'Student Progress Report Template',
-        fileName: 'progress_report_template.xlsx',
-        category: 'Administrative Forms',
-        uploadDate: '2024-01-10',
-        fileSize: '432 KB',
-        fileType: 'XLSX',
-        isShared: true
-      },
-      {
-        id: '5',
-        title: 'English Lesson Plan - Grammar',
-        fileName: 'english_grammar_lesson.pdf',
-        category: 'Lesson Plans',
-        class: 'Grade 4',
-        subject: 'English',
-        uploadDate: '2024-01-08',
-        fileSize: '1.2 MB',
-        fileType: 'PDF',
-        isShared: false
-      }
-    ]);
-  }, []);
+    fetchCategories();
+    fetchDocuments();
+    fetchDashboardStats();
+  }, [fetchCategories, fetchDocuments, fetchDashboardStats]);
 
   const selectedCategory = categories.find(cat => cat.id === uploadForm.category);
-  const storageUsed = 245; // MB
-  const storageTotal = 1024; // MB (1GB)
-  const storagePercentage = (storageUsed / storageTotal) * 100;
+  const recentFiles = documents.slice(0, 5); // Show 5 most recent documents
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,8 +81,13 @@ export default function TeacherDashboard() {
 
     setIsUploading(true);
     try {
-      // Simulate API upload
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await uploadDocument({
+        title: uploadForm.title,
+        file: uploadForm.file,
+        categoryId: uploadForm.category,
+        classLevel: uploadForm.class || undefined,
+        subject: uploadForm.subject || undefined,
+      });
       
       // Reset form
       setUploadForm({
@@ -154,12 +98,17 @@ export default function TeacherDashboard() {
         subject: ''
       });
       
-      setUploadSuccess(true);
-      setTimeout(() => setUploadSuccess(false), 3000);
+      toast.success('Document Uploaded', {
+        description: 'Your document has been uploaded successfully'
+      });
       
-      // In real app, refetch recent files here
+      // Refresh data
+      fetchDocuments();
+      fetchDashboardStats();
     } catch (error) {
-      console.error('Upload failed:', error);
+      toast.error('Upload Failed', {
+        description: 'Failed to upload document. Please try again.'
+      });
     } finally {
       setIsUploading(false);
     }
@@ -195,13 +144,13 @@ export default function TeacherDashboard() {
     return <FileText className="h-4 w-4" />;
   };
 
-  const handleView = (file: DocumentFile) => {
+  const handleView = (file: any) => {
     // In real app, this would open document in preview modal or new tab
     console.log('Viewing:', file.fileName);
     window.open(`/preview/${file.id}`, '_blank');
   };
 
-  const handleDownload = (file: DocumentFile) => {
+  const handleDownload = (file: any) => {
     // In real app, this would trigger actual download
     console.log('Downloading:', file.fileName);
     // Simulate download
@@ -214,17 +163,39 @@ export default function TeacherDashboard() {
     });
   };
 
-  const handleShare = (file: DocumentFile) => {
-    // In real app, this would open share dialog
-    console.log('Sharing:', file.fileName);
-    toast.info('Share Document', {
-      description: `Sharing options for "${file.title}" - feature will be enhanced soon`
-    });
-    // For now, just toggle share status
-    setRecentFiles(prev => prev.map(f =>
-      f.id === file.id ? { ...f, isShared: !f.isShared } : f
-    ));
+  const handleShare = async (file: any) => {
+    try {
+      await shareDocument(file.id, true);
+      toast.success('Document Shared', {
+        description: `"${file.title}" has been shared successfully`
+      });
+      fetchDocuments(); // Refresh list
+    } catch (error) {
+      toast.error('Share Failed', {
+        description: 'Failed to share document. Please try again.'
+      });
+    }
   };
+
+  // Loading state
+  if (documentsLoading || categoriesLoading || statsLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loading text="Loading dashboard..." />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Error state
+  if (documentsError || categoriesError || statsError) {
+    return (
+      <Layout>
+        <ErrorMessage message={documentsError || categoriesError || statsError || 'Unknown error'} />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -247,9 +218,9 @@ export default function TeacherDashboard() {
               <FolderOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">24</div>
+              <div className="text-2xl font-bold">{(stats as any)?.documentsUploaded || 0}</div>
               <p className="text-xs text-muted-foreground">
-                +3 from last week
+                Your uploaded documents
               </p>
             </CardContent>
           </Card>
@@ -260,11 +231,11 @@ export default function TeacherDashboard() {
               <HardDrive className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{storageUsed} MB</div>
+              <div className="text-2xl font-bold">245 MB</div>
               <div className="mt-2 space-y-1">
-                <Progress value={storagePercentage} className="h-2" />
+                <Progress value={24} className="h-2" />
                 <p className="text-xs text-muted-foreground">
-                  {storageUsed} MB of {storageTotal} MB used
+                  245 MB of 1024 MB used
                 </p>
               </div>
             </CardContent>
@@ -276,7 +247,7 @@ export default function TeacherDashboard() {
               <Share className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">8</div>
+              <div className="text-2xl font-bold">{(stats as any)?.documentsShared || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Files shared with colleagues
               </p>
@@ -381,11 +352,11 @@ export default function TeacherDashboard() {
                   </div>
                 )}
 
-                {uploadSuccess && (
-                  <Alert className="bg-success/10 border-success/20">
-                    <CheckCircle className="h-4 w-4 text-success" />
-                    <AlertDescription className="text-success-foreground">
-                      Document uploaded successfully!
+                {uploadForm.file && (
+                  <Alert className="bg-info/10 border-info/20">
+                    <FileText className="h-4 w-4 text-info" />
+                    <AlertDescription className="text-info-foreground">
+                      Selected file: {uploadForm.file.name} ({(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB)
                     </AlertDescription>
                   </Alert>
                 )}
@@ -393,7 +364,7 @@ export default function TeacherDashboard() {
                 <Button type="submit" disabled={isUploading} className="w-full">
                   {isUploading ? (
                     <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
+                      <Loading size="sm" className="mr-2" />
                       Uploading...
                     </>
                   ) : (
@@ -420,59 +391,67 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="flex-shrink-0">
-                        {getFileIcon(file.fileType)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {file.title}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{file.category}</span>
-                          {file.class && file.subject && (
-                            <>
-                              <span>•</span>
-                              <span>{file.class} - {file.subject}</span>
-                            </>
-                          )}
-                          <span>•</span>
-                          <span>{formatDate(file.uploadDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {file.fileType}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {file.fileSize}
-                          </span>
-                          {file.isShared && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Share className="h-3 w-3 mr-1" />
-                              Shared
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleView(file)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDownload(file)}>
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleShare(file)}>
-                        <Share className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {recentFiles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No documents uploaded yet</p>
+                    <p className="text-sm text-muted-foreground">Upload your first document to get started</p>
                   </div>
-                ))}
+                ) : (
+                  recentFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex-shrink-0">
+                          {getFileIcon(file.fileType || 'PDF')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {file.title}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{file.category?.name || 'Uncategorized'}</span>
+                            {file.classLevel && file.subject && (
+                              <>
+                                <span>•</span>
+                                <span>{file.classLevel} - {file.subject}</span>
+                              </>
+                            )}
+                            <span>•</span>
+                            <span>{formatDate(file.createdAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {file.fileType || 'PDF'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {((file.fileSize || 0) / 1024 / 1024).toFixed(2)} MB
+                            </span>
+                            {file.isShared && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Share className="h-3 w-3 mr-1" />
+                                Shared
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleView(file)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDownload(file)}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleShare(file)}>
+                          <Share className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
