@@ -1,0 +1,740 @@
+/**
+ * Main API Client
+ * Simulates Django REST Framework API responses
+ */
+
+import { 
+  ApiResponse, 
+  ApiError, 
+  User, 
+  LoginRequest, 
+  LoginResponse, 
+  RegisterRequest,
+  OTPVerificationRequest,
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
+  Teacher,
+  TeacherCreateRequest,
+  TeacherUpdateRequest,
+  TeacherApprovalRequest,
+  Document,
+  DocumentCreateRequest,
+  DocumentUpdateRequest,
+  DocumentShareRequest,
+  DocumentCategory,
+  CategoryCreateRequest,
+  CategoryUpdateRequest,
+  DashboardStats,
+  TeacherDashboardStats,
+  SystemSettings,
+  SecuritySettings,
+  ActivityLog,
+  PaginatedResponse,
+  SearchFilters,
+  SearchResults,
+  AuthTokens
+} from './types';
+
+import { mockDataStore } from './mockData';
+import API_ENDPOINTS from './endpoints';
+
+// Simulate network delay
+const NETWORK_DELAY = 500; // ms
+
+const delay = (ms: number = NETWORK_DELAY): Promise<void> => 
+  new Promise(resolve => setTimeout(resolve, ms));
+
+// Mock JWT tokens
+const generateMockToken = (user: User): AuthTokens => ({
+  access: `mock_access_token_${user.id}_${Date.now()}`,
+  refresh: `mock_refresh_token_${user.id}_${Date.now()}`,
+});
+
+// Error simulation helper
+const simulateError = (message: string, status: number = 400): never => {
+  throw new ApiError(message, status);
+};
+
+// API Client Class
+export class ApiClient {
+  private static instance: ApiClient;
+
+  public static getInstance(): ApiClient {
+    if (!ApiClient.instance) {
+      ApiClient.instance = new ApiClient();
+    }
+    return ApiClient.instance;
+  }
+
+  private getAuthHeader(): Record<string, string> {
+    const token = mockDataStore.getAuthToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  private getCurrentUser(): User {
+    const user = mockDataStore.getCurrentUser();
+    if (!user) {
+      simulateError('Authentication required', 401);
+    }
+    return user;
+  }
+
+  private requireRole(role: 'admin' | 'teacher'): User {
+    const user = this.getCurrentUser();
+    if (user.role !== role) {
+      simulateError('Insufficient permissions', 403);
+    }
+    return user;
+  }
+
+  // Authentication Methods
+  async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
+    await delay();
+
+    const users = mockDataStore.getUsers();
+    const user = users.find(u => u.email === credentials.email);
+
+    if (!user || !user.isActive) {
+      simulateError('Invalid credentials', 401);
+    }
+
+    // Mock password validation (in real app, this would be hashed)
+    const validPasswords: Record<string, string> = {
+      'admin@school.co.ke': 'admin123',
+      'teacher@school.co.ke': 'teacher123',
+      'john.kiprotich@school.co.ke': 'teacher123',
+      'mary.ochieng@school.co.ke': 'teacher123',
+    };
+
+    if (validPasswords[credentials.email] !== credentials.password) {
+      simulateError('Invalid credentials', 401);
+    }
+
+    // Update last login
+    user.lastLogin = new Date().toISOString();
+    const updatedUsers = users.map(u => u.id === user.id ? user : u);
+    mockDataStore.saveUsers(updatedUsers);
+
+    // Generate tokens
+    const tokens = generateMockToken(user);
+    
+    // Save authentication state
+    mockDataStore.saveCurrentUser(user);
+    mockDataStore.saveAuthToken(tokens.access);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user,
+      action: 'login',
+      description: 'logged into the system',
+    });
+
+    return {
+      success: true,
+      data: { user, tokens },
+      message: 'Login successful',
+    };
+  }
+
+  async register(data: RegisterRequest): Promise<ApiResponse<{ message: string }>> {
+    await delay();
+
+    if (data.password !== data.confirmPassword) {
+      simulateError('Passwords do not match', 400);
+    }
+
+    const users = mockDataStore.getUsers();
+    const existingUser = users.find(u => u.email === data.email);
+
+    if (existingUser) {
+      simulateError('Email already registered', 400);
+    }
+
+    const newUser: User = {
+      id: mockDataStore.generateId(),
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: 'teacher',
+      isActive: false, // Requires email verification
+      dateJoined: new Date().toISOString(),
+    };
+
+    // Create teacher profile
+    const newTeacher: Teacher = {
+      id: mockDataStore.generateId(),
+      user: newUser,
+      status: 'pending',
+      documentsCount: 0,
+      sharedDocumentsCount: 0,
+      totalDownloads: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    users.push(newUser);
+    const teachers = mockDataStore.getTeachers();
+    teachers.push(newTeacher);
+
+    mockDataStore.saveUsers(users);
+    mockDataStore.saveTeachers(teachers);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user: newUser,
+      action: 'register',
+      description: 'registered for an account',
+    });
+
+    return {
+      success: true,
+      data: { message: 'Registration successful. Please verify your email with the OTP sent to your inbox.' },
+      message: 'Registration successful',
+    };
+  }
+
+  async verifyOTP(data: OTPVerificationRequest): Promise<ApiResponse<LoginResponse>> {
+    await delay();
+
+    // Mock OTP verification (always accept "123456")
+    if (data.otp !== '123456') {
+      simulateError('Invalid OTP', 400);
+    }
+
+    const users = mockDataStore.getUsers();
+    const user = users.find(u => u.email === data.email);
+
+    if (!user) {
+      simulateError('User not found', 404);
+    }
+
+    // Activate user
+    user.isActive = true;
+    const updatedUsers = users.map(u => u.id === user.id ? user : u);
+    mockDataStore.saveUsers(updatedUsers);
+
+    // Generate tokens
+    const tokens = generateMockToken(user);
+    
+    // Save authentication state
+    mockDataStore.saveCurrentUser(user);
+    mockDataStore.saveAuthToken(tokens.access);
+
+    return {
+      success: true,
+      data: { user, tokens },
+      message: 'Email verified successfully',
+    };
+  }
+
+  async logout(): Promise<ApiResponse<{ message: string }>> {
+    await delay();
+
+    const user = mockDataStore.getCurrentUser();
+    
+    // Clear authentication state
+    mockDataStore.saveCurrentUser(null);
+    mockDataStore.saveAuthToken(null);
+
+    // Log activity if user was logged in
+    if (user) {
+      mockDataStore.addActivityLog({
+        user,
+        action: 'login', // logout action
+        description: 'logged out of the system',
+      });
+    }
+
+    return {
+      success: true,
+      data: { message: 'Logout successful' },
+      message: 'Logout successful',
+    };
+  }
+
+  async forgotPassword(data: PasswordResetRequest): Promise<ApiResponse<{ message: string }>> {
+    await delay();
+
+    const users = mockDataStore.getUsers();
+    const user = users.find(u => u.email === data.email);
+
+    if (!user) {
+      // Don't reveal if email exists for security
+      return {
+        success: true,
+        data: { message: 'If the email exists, a password reset link has been sent.' },
+        message: 'Password reset email sent',
+      };
+    }
+
+    return {
+      success: true,
+      data: { message: 'Password reset link has been sent to your email.' },
+      message: 'Password reset email sent',
+    };
+  }
+
+  // Profile Methods
+  async getProfile(): Promise<ApiResponse<User>> {
+    await delay();
+    
+    const user = this.getCurrentUser();
+    
+    return {
+      success: true,
+      data: user,
+      message: 'Profile retrieved successfully',
+    };
+  }
+
+  async updateProfile(data: Partial<User>): Promise<ApiResponse<User>> {
+    await delay();
+
+    const currentUser = this.getCurrentUser();
+    const users = mockDataStore.getUsers();
+    
+    const updatedUser = { ...currentUser, ...data, updatedAt: new Date().toISOString() };
+    const updatedUsers = users.map(u => u.id === currentUser.id ? updatedUser : u);
+    
+    mockDataStore.saveUsers(updatedUsers);
+    mockDataStore.saveCurrentUser(updatedUser);
+
+    // Update teacher profile if user is teacher
+    if (updatedUser.role === 'teacher') {
+      const teachers = mockDataStore.getTeachers();
+      const teacherIndex = teachers.findIndex(t => t.user.id === updatedUser.id);
+      if (teacherIndex !== -1) {
+        teachers[teacherIndex].user = updatedUser;
+        teachers[teacherIndex].updatedAt = new Date().toISOString();
+        mockDataStore.saveTeachers(teachers);
+      }
+    }
+
+    return {
+      success: true,
+      data: updatedUser,
+      message: 'Profile updated successfully',
+    };
+  }
+
+  // Teacher Methods
+  async getTeachers(): Promise<ApiResponse<Teacher[]>> {
+    await delay();
+    
+    this.requireRole('admin');
+    const teachers = mockDataStore.getTeachers();
+    
+    return {
+      success: true,
+      data: teachers,
+      message: 'Teachers retrieved successfully',
+    };
+  }
+
+  async approveTeacher(teacherId: string, data: TeacherApprovalRequest): Promise<ApiResponse<Teacher>> {
+    await delay();
+
+    const adminUser = this.requireRole('admin');
+    const teachers = mockDataStore.getTeachers();
+    const teacherIndex = teachers.findIndex(t => t.id === teacherId);
+
+    if (teacherIndex === -1) {
+      simulateError('Teacher not found', 404);
+    }
+
+    const teacher = teachers[teacherIndex];
+    
+    if (data.approved) {
+      teacher.status = 'active';
+      teacher.approvedBy = adminUser.id;
+      teacher.approvedAt = new Date().toISOString();
+      teacher.rejectionReason = undefined;
+    } else {
+      teacher.status = 'pending';
+      teacher.rejectedBy = adminUser.id;
+      teacher.rejectedAt = new Date().toISOString();
+      teacher.rejectionReason = data.rejectionReason;
+    }
+    
+    teacher.updatedAt = new Date().toISOString();
+    teachers[teacherIndex] = teacher;
+    mockDataStore.saveTeachers(teachers);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user: adminUser,
+      action: data.approved ? 'approve' : 'reject',
+      targetType: 'teacher',
+      targetId: teacher.id,
+      targetName: `${teacher.user.firstName} ${teacher.user.lastName}`,
+      description: `${data.approved ? 'approved' : 'rejected'} teacher account for ${teacher.user.firstName} ${teacher.user.lastName}`,
+    });
+
+    return {
+      success: true,
+      data: teacher,
+      message: `Teacher ${data.approved ? 'approved' : 'rejected'} successfully`,
+    };
+  }
+
+  // Document Methods
+  async getDocuments(filters?: SearchFilters): Promise<ApiResponse<Document[]>> {
+    await delay();
+
+    const user = this.getCurrentUser();
+    let documents = mockDataStore.getDocuments();
+
+    // Filter by teacher if not admin
+    if (user.role === 'teacher') {
+      documents = documents.filter(d => d.teacher.user.id === user.id);
+    }
+
+    // Apply filters
+    if (filters) {
+      if (filters.category) {
+        documents = documents.filter(d => d.category.id === filters.category);
+      }
+      if (filters.query) {
+        const query = filters.query.toLowerCase();
+        documents = documents.filter(d => 
+          d.title.toLowerCase().includes(query) ||
+          d.description?.toLowerCase().includes(query)
+        );
+      }
+    }
+
+    return {
+      success: true,
+      data: documents,
+      message: 'Documents retrieved successfully',
+    };
+  }
+
+  async createDocument(data: DocumentCreateRequest): Promise<ApiResponse<Document>> {
+    await delay();
+
+    const user = this.getCurrentUser();
+    if (user.role !== 'teacher') {
+      simulateError('Only teachers can upload documents', 403);
+    }
+
+    const teachers = mockDataStore.getTeachers();
+    const teacher = teachers.find(t => t.user.id === user.id);
+    if (!teacher) {
+      simulateError('Teacher profile not found', 404);
+    }
+
+    const categories = mockDataStore.getCategories();
+    const category = categories.find(c => c.id === data.categoryId);
+    if (!category) {
+      simulateError('Category not found', 404);
+    }
+
+    // Validate required fields for category
+    if (category.requiresClassSubject && (!data.classLevel || !data.subject)) {
+      simulateError('Class level and subject are required for this category', 400);
+    }
+
+    const newDocument: Document = {
+      id: mockDataStore.generateId(),
+      title: data.title,
+      description: data.description,
+      category,
+      teacher,
+      fileName: data.file.name,
+      fileSize: data.file.size,
+      fileType: data.file.type,
+      filePath: `/uploads/documents/${data.file.name}`,
+      classLevel: data.classLevel,
+      subject: data.subject,
+      isShared: false,
+      downloadCount: 0,
+      status: 'published',
+      tags: data.tags || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const documents = mockDataStore.getDocuments();
+    documents.push(newDocument);
+    mockDataStore.saveDocuments(documents);
+
+    // Update teacher document count
+    teacher.documentsCount += 1;
+    teacher.updatedAt = new Date().toISOString();
+    const updatedTeachers = teachers.map(t => t.id === teacher.id ? teacher : t);
+    mockDataStore.saveTeachers(updatedTeachers);
+
+    // Update category document count
+    category.documentsCount += 1;
+    category.updatedAt = new Date().toISOString();
+    const updatedCategories = categories.map(c => c.id === category.id ? category : c);
+    mockDataStore.saveCategories(updatedCategories);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user,
+      action: 'upload',
+      targetType: 'document',
+      targetId: newDocument.id,
+      targetName: newDocument.title,
+      description: `uploaded "${newDocument.title}"`,
+    });
+
+    return {
+      success: true,
+      data: newDocument,
+      message: 'Document uploaded successfully',
+    };
+  }
+
+  async shareDocument(documentId: string, data: DocumentShareRequest): Promise<ApiResponse<Document>> {
+    await delay();
+
+    const user = this.getCurrentUser();
+    const documents = mockDataStore.getDocuments();
+    const documentIndex = documents.findIndex(d => d.id === documentId);
+
+    if (documentIndex === -1) {
+      simulateError('Document not found', 404);
+    }
+
+    const document = documents[documentIndex];
+
+    // Check permissions
+    if (user.role === 'teacher' && document.teacher.user.id !== user.id) {
+      simulateError('You can only share your own documents', 403);
+    }
+
+    document.isShared = data.isShared;
+    document.sharedAt = data.isShared ? new Date().toISOString() : undefined;
+    document.updatedAt = new Date().toISOString();
+
+    documents[documentIndex] = document;
+    mockDataStore.saveDocuments(documents);
+
+    // Update teacher shared documents count
+    const teachers = mockDataStore.getTeachers();
+    const teacher = teachers.find(t => t.id === document.teacher.id);
+    if (teacher) {
+      teacher.sharedDocumentsCount = documents.filter(d => 
+        d.teacher.id === teacher.id && d.isShared
+      ).length;
+      teacher.updatedAt = new Date().toISOString();
+      const updatedTeachers = teachers.map(t => t.id === teacher.id ? teacher : t);
+      mockDataStore.saveTeachers(updatedTeachers);
+    }
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user,
+      action: 'share',
+      targetType: 'document',
+      targetId: document.id,
+      targetName: document.title,
+      description: `${data.isShared ? 'shared' : 'unshared'} "${document.title}"`,
+    });
+
+    return {
+      success: true,
+      data: document,
+      message: `Document ${data.isShared ? 'shared' : 'unshared'} successfully`,
+    };
+  }
+
+  // Category Methods
+  async getCategories(): Promise<ApiResponse<DocumentCategory[]>> {
+    await delay();
+
+    const categories = mockDataStore.getCategories();
+    
+    return {
+      success: true,
+      data: categories,
+      message: 'Categories retrieved successfully',
+    };
+  }
+
+  async createCategory(data: CategoryCreateRequest): Promise<ApiResponse<DocumentCategory>> {
+    await delay();
+
+    this.requireRole('admin');
+
+    const categories = mockDataStore.getCategories();
+    const existingCategory = categories.find(c => 
+      c.name.toLowerCase() === data.name.toLowerCase()
+    );
+
+    if (existingCategory) {
+      simulateError('Category name already exists', 400);
+    }
+
+    const newCategory: DocumentCategory = {
+      id: mockDataStore.generateId(),
+      name: data.name,
+      description: data.description || '',
+      requiresClassSubject: data.requiresClassSubject,
+      documentsCount: 0,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    categories.push(newCategory);
+    mockDataStore.saveCategories(categories);
+
+    return {
+      success: true,
+      data: newCategory,
+      message: 'Category created successfully',
+    };
+  }
+
+  async deleteCategory(categoryId: string): Promise<ApiResponse<{ message: string }>> {
+    await delay();
+
+    this.requireRole('admin');
+
+    const categories = mockDataStore.getCategories();
+    const categoryIndex = categories.findIndex(c => c.id === categoryId);
+
+    if (categoryIndex === -1) {
+      simulateError('Category not found', 404);
+    }
+
+    const category = categories[categoryIndex];
+
+    if (category.documentsCount > 0) {
+      simulateError('Cannot delete category with existing documents', 400);
+    }
+
+    categories.splice(categoryIndex, 1);
+    mockDataStore.saveCategories(categories);
+
+    return {
+      success: true,
+      data: { message: 'Category deleted successfully' },
+      message: 'Category deleted successfully',
+    };
+  }
+
+  // Dashboard Methods
+  async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
+    await delay();
+
+    this.requireRole('admin');
+    const stats = mockDataStore.getDashboardStats();
+
+    return {
+      success: true,
+      data: stats,
+      message: 'Dashboard stats retrieved successfully',
+    };
+  }
+
+  async getTeacherDashboardStats(): Promise<ApiResponse<TeacherDashboardStats>> {
+    await delay();
+
+    const user = this.getCurrentUser();
+    if (user.role !== 'teacher') {
+      simulateError('Only teachers can access teacher dashboard stats', 403);
+    }
+
+    const stats = mockDataStore.getTeacherDashboardStats(user.id);
+
+    return {
+      success: true,
+      data: stats,
+      message: 'Teacher dashboard stats retrieved successfully',
+    };
+  }
+
+  // Settings Methods
+  async getSystemSettings(): Promise<ApiResponse<SystemSettings>> {
+    await delay();
+
+    this.requireRole('admin');
+    const settings = mockDataStore.getSystemSettings();
+
+    return {
+      success: true,
+      data: settings,
+      message: 'System settings retrieved successfully',
+    };
+  }
+
+  async updateSystemSettings(data: Partial<SystemSettings>): Promise<ApiResponse<SystemSettings>> {
+    await delay();
+
+    this.requireRole('admin');
+    const currentSettings = mockDataStore.getSystemSettings();
+    const updatedSettings = { ...currentSettings, ...data };
+    
+    mockDataStore.saveSystemSettings(updatedSettings);
+
+    return {
+      success: true,
+      data: updatedSettings,
+      message: 'System settings updated successfully',
+    };
+  }
+
+  async getSecuritySettings(): Promise<ApiResponse<SecuritySettings>> {
+    await delay();
+
+    this.requireRole('admin');
+    const settings = mockDataStore.getSecuritySettings();
+
+    return {
+      success: true,
+      data: settings,
+      message: 'Security settings retrieved successfully',
+    };
+  }
+
+  async updateSecuritySettings(data: Partial<SecuritySettings>): Promise<ApiResponse<SecuritySettings>> {
+    await delay();
+
+    this.requireRole('admin');
+    const currentSettings = mockDataStore.getSecuritySettings();
+    const updatedSettings = { ...currentSettings, ...data };
+    
+    mockDataStore.saveSecuritySettings(updatedSettings);
+
+    return {
+      success: true,
+      data: updatedSettings,
+      message: 'Security settings updated successfully',
+    };
+  }
+
+  // Activity Methods
+  async getActivityLogs(): Promise<ApiResponse<ActivityLog[]>> {
+    await delay();
+
+    this.requireRole('admin');
+    const logs = mockDataStore.getActivityLogs();
+
+    return {
+      success: true,
+      data: logs,
+      message: 'Activity logs retrieved successfully',
+    };
+  }
+}
+
+// Custom Error class
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public errors?: Record<string, string[]>
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Export singleton instance
+export const apiClient = ApiClient.getInstance();
+export default apiClient;
