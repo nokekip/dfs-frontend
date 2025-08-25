@@ -6,6 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { 
   Users, 
   FolderOpen, 
   FileText, 
@@ -56,6 +64,13 @@ export default function AdminDashboard() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  
+  // Dialog states
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [editCategoryDialogOpen, setEditCategoryDialogOpen] = useState(false);
+  const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
 
   const handleViewReports = () => {
     window.location.href = '/admin/reports';
@@ -72,6 +87,61 @@ export default function AdminDashboard() {
 
   const handleSystemLogs = () => {
     window.location.href = '/admin/activity';
+  };
+
+  const handleApproveTeacher = (teacher: Teacher) => {
+    setSelectedTeacher(teacher);
+    setApproveDialogOpen(true);
+  };
+
+  const confirmApproval = () => {
+    if (selectedTeacher) {
+      setTeachers(prev => 
+        prev.map(teacher => 
+          teacher.id === selectedTeacher.id 
+            ? { ...teacher, status: 'active' as const }
+            : teacher
+        )
+      );
+      setApproveDialogOpen(false);
+      setSelectedTeacher(null);
+      console.log(`Approved teacher: ${selectedTeacher.firstName} ${selectedTeacher.lastName}`);
+    }
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setSelectedCategory(category);
+    setEditCategoryDialogOpen(true);
+  };
+
+  const confirmEditCategory = () => {
+    if (selectedCategory) {
+      // For now, just redirect to categories page for actual editing
+      setEditCategoryDialogOpen(false);
+      setSelectedCategory(null);
+      window.location.href = '/admin/categories';
+    }
+  };
+
+  const handleDeleteCategory = (category: Category) => {
+    setSelectedCategory(category);
+    setDeleteCategoryDialogOpen(true);
+  };
+
+  const confirmDeleteCategory = () => {
+    if (!selectedCategory) return;
+    
+    if (selectedCategory.documentsCount > 0) {
+      console.log('Cannot delete category with existing documents');
+      setDeleteCategoryDialogOpen(false);
+      setSelectedCategory(null);
+      return;
+    }
+    
+    setCategories(prev => prev.filter(category => category.id !== selectedCategory.id));
+    setDeleteCategoryDialogOpen(false);
+    setSelectedCategory(null);
+    console.log(`Deleted category: ${selectedCategory.name}`);
   };
 
   // Mock data - in real app, this would come from Django REST API
@@ -368,7 +438,11 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       {getStatusBadge(teacher.status)}
                       {teacher.status === 'pending' && (
-                        <Button size="sm" variant="outline">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleApproveTeacher(teacher)}
+                        >
                           Approve
                         </Button>
                       )}
@@ -407,10 +481,18 @@ export default function AdminDashboard() {
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-medium">{category.name}</h3>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditCategory(category)}
+                      >
                         <Edit className="h-3 w-3" />
                       </Button>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteCategory(category)}
+                      >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -456,6 +538,78 @@ export default function AdminDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Approval Dialog */}
+      <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Teacher Account</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to approve the account for {selectedTeacher?.firstName} {selectedTeacher?.lastName}? 
+              They will gain full access to the system.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmApproval} className="bg-success hover:bg-success/90">
+              <UserCheck className="h-4 w-4 mr-2" />
+              Approve Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Category Dialog */}
+      <Dialog open={editCategoryDialogOpen} onOpenChange={setEditCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Category</DialogTitle>
+            <DialogDescription>
+              You will be redirected to the categories management page to edit "{selectedCategory?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCategoryDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmEditCategory}>
+              <Edit className="h-4 w-4 mr-2" />
+              Continue to Edit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Category Dialog */}
+      <Dialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Category</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the category "{selectedCategory?.name}"? 
+              {selectedCategory?.documentsCount === 0 
+                ? " This action cannot be undone."
+                : ` This category has ${selectedCategory?.documentsCount} documents and cannot be deleted.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCategoryDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmDeleteCategory} 
+              variant="destructive"
+              disabled={selectedCategory?.documentsCount ? selectedCategory.documentsCount > 0 : false}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
