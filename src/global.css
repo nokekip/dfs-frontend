@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    --background: 0 0% 99%;
+    --foreground: 216 19% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 216 19% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 19% 16%;
+
+    --primary: 200 95% 27%;
+    --primary-foreground: 0 0% 100%;
+    --primary-50: 199 89% 96%;
+    --primary-100: 200 85% 90%;
+    --primary-200: 200 84% 79%;
+    --primary-500: 200 95% 27%;
+    --primary-600: 200 91% 24%;
+    --primary-700: 200 85% 20%;
+    --primary-900: 201 90% 12%;
+
+    --secondary: 210 15% 96%;
+    --secondary-foreground: 216 19% 16%;
+
+    --muted: 210 15% 96%;
+    --muted-foreground: 215 15% 47%;
+
+    --accent: 210 15% 93%;
+    --accent-foreground: 216 19% 16%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 214 15% 91%;
+    --input: 214 15% 91%;
+    --ring: 200 95% 27%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 216 28% 7%;
+    --foreground: 210 20% 93%;
+
+    --card: 216 28% 9%;
+    --card-foreground: 210 20% 93%;
+
+    --popover: 216 28% 9%;
+    --popover-foreground: 210 20% 93%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 216 28% 7%;
+    --primary-50: 199 89% 96%;
+    --primary-100: 200 85% 90%;
+    --primary-200: 200 84% 79%;
+    --primary-500: 199 89% 48%;
+    --primary-600: 199 85% 42%;
+    --primary-700: 199 80% 35%;
+    --primary-900: 199 85% 20%;
+
+    --secondary: 216 19% 16%;
+    --secondary-foreground: 210 20% 93%;
+
+    --muted: 216 19% 16%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 216 19% 19%;
+    --accent-foreground: 210 20% 93%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 95% 60%;
+    --warning-foreground: 0 0% 0%;
+
+    --info: 199 89% 65%;
+    --info-foreground: 216 28% 7%;
+
+    --border: 216 19% 16%;
+    --input: 216 19% 16%;
+    --ring: 199 89% 48%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Improve mobile touch targets */
+  @media (max-width: 768px) {
+    button, [role="button"], input, select, textarea {
+      min-height: 44px;
+    }
+  }
+
+  /* Ensure proper scrolling on mobile */
+  .scroll-area {
+    -webkit-overflow-scrolling: touch;
+  }
+}
