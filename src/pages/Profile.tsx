@@ -6,9 +6,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import { toast } from 'sonner';
 import { 
   User, 
   Mail, 
@@ -27,8 +28,6 @@ import {
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
-  const [saveSuccess, setSaveSuccess] = useState('');
-  const [saveError, setSaveError] = useState('');
   
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || '',
@@ -37,7 +36,8 @@ export default function Profile() {
     phoneNumber: '+254 712 345 678',
     bio: user?.role === 'admin' 
       ? 'System administrator responsible for managing the digital filing system and supporting teachers.'
-      : 'Passionate educator with 8 years of experience in primary education.'
+      : 'Passionate educator with 8 years of experience in primary education.',
+    profilePicture: undefined as string | undefined
   });
 
   const [activityStats] = useState({
@@ -59,12 +59,39 @@ export default function Profile() {
         email: profileData.email,
       });
       
-      setSaveSuccess('Profile updated successfully!');
-      setTimeout(() => setSaveSuccess(''), 3000);
+      toast.success('Profile Updated', {
+        description: 'Your profile information has been saved successfully'
+      });
     } catch (error) {
-      setSaveError('Failed to update profile. Please try again.');
-      setTimeout(() => setSaveError(''), 3000);
+      toast.error('Update Failed', {
+        description: 'Failed to update profile. Please try again.'
+      });
     }
+  };
+
+  const handleChangePhoto = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        // In real app, this would upload to server
+        const imageUrl = URL.createObjectURL(file);
+        setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
+        toast.success('Photo Updated', {
+          description: 'Profile photo has been updated successfully'
+        });
+      }
+    };
+    input.click();
+  };
+
+  const handleRemovePhoto = () => {
+    setProfileData(prev => ({ ...prev, profilePicture: undefined }));
+    toast.success('Photo Removed', {
+      description: 'Profile photo has been removed successfully'
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -97,23 +124,7 @@ export default function Profile() {
         </div>
 
         {/* Success/Error Messages */}
-        {saveSuccess && (
-          <Alert className="bg-success/10 border-success/20">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription className="text-success-foreground">
-              {saveSuccess}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {saveError && (
-          <Alert className="bg-destructive/10 border-destructive/20">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-            <AlertDescription className="text-destructive">
-              {saveError}
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* Messages now handled by toast notifications */}
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Profile Information */}
@@ -132,17 +143,20 @@ export default function Profile() {
                 {/* Profile Picture */}
                 <div className="flex items-center gap-6">
                   <Avatar className="h-20 w-20">
+                    {profileData.profilePicture && (
+                      <AvatarImage src={profileData.profilePicture} alt="Profile" />
+                    )}
                     <AvatarFallback className="text-lg bg-primary text-primary-foreground">
                       {profileData.firstName[0]}{profileData.lastName[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={handleChangePhoto}>
                         <Camera className="h-4 w-4 mr-2" />
                         Change Photo
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={handleRemovePhoto}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         Remove
                       </Button>
