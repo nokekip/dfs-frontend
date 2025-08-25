@@ -13,8 +13,6 @@ import {
   User, 
   Mail, 
   Phone, 
-  School, 
-  IdCard, 
   Calendar,
   CheckCircle,
   AlertTriangle,
@@ -37,12 +35,9 @@ export default function Profile() {
     lastName: user?.lastName || '',
     email: user?.email || '',
     phoneNumber: '+254 712 345 678',
-    school: 'Nairobi Primary School',
-    employeeId: 'TSC/12345/2023',
     bio: user?.role === 'admin' 
       ? 'System administrator responsible for managing the digital filing system and supporting teachers.'
-      : 'Passionate educator with 8 years of experience in primary education. Specialized in Mathematics and Science curriculum development.',
-    subjects: user?.role === 'admin' ? [] : ['Mathematics', 'Science']
+      : 'Passionate educator with 8 years of experience in primary education.'
   });
 
   const [activityStats] = useState({
@@ -206,51 +201,7 @@ export default function Profile() {
                 {/* Professional Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Professional Details</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="school">School/Institution</Label>
-                      <div className="relative">
-                        <School className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="school"
-                          value={profileData.school}
-                          onChange={(e) => setProfileData(prev => ({ ...prev, school: e.target.value }))}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="employeeId">{user?.role === 'admin' ? 'Employee ID' : 'TSC Number'}</Label>
-                      <div className="relative">
-                        <IdCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="employeeId"
-                          value={profileData.employeeId}
-                          onChange={(e) => setProfileData(prev => ({ ...prev, employeeId: e.target.value }))}
-                          className="pl-10"
-                          disabled
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {user?.role === 'teacher' && (
-                    <div className="space-y-2">
-                      <Label>Teaching Subjects</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {profileData.subjects.map((subject, index) => (
-                          <Badge key={index} variant="secondary">
-                            {subject}
-                          </Badge>
-                        ))}
-                        <Button variant="outline" size="sm">
-                          <User className="h-4 w-4 mr-2" />
-                          Edit Subjects
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
+                  
                   <div className="space-y-2">
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea

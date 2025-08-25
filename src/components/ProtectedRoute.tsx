@@ -49,7 +49,7 @@ export default function ProtectedRoute({
           <div className="bg-warning/10 border border-warning/20 rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-2">Account Pending</h2>
             <p className="text-muted-foreground mb-4">
-              Your account is pending approval from the school administrator. 
+              Your account is pending approval from the system administrator. 
               You will receive an email notification once your account is activated.
             </p>
             <button 

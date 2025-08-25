@@ -36,7 +36,6 @@ import {
   MoreHorizontal,
   Mail,
   Phone,
-  School,
   Calendar,
   Clock,
   CheckCircle,
@@ -60,8 +59,6 @@ interface Teacher {
   lastName: string;
   email: string;
   phoneNumber: string;
-  school: string;
-  employeeId: string;
   status: 'active' | 'pending' | 'suspended' | 'rejected';
   joinDate: string;
   lastLogin?: string;
@@ -69,7 +66,6 @@ interface Teacher {
   approvalDate?: string;
   approvedBy?: string;
   rejectionReason?: string;
-  subjects: string[];
   bio?: string;
 }
 
@@ -78,9 +74,6 @@ interface NewTeacherData {
   lastName: string;
   email: string;
   phoneNumber: string;
-  school: string;
-  employeeId: string;
-  subjects: string[];
   temporaryPassword: string;
 }
 
@@ -104,9 +97,6 @@ export default function AdminTeachers() {
     lastName: '',
     email: '',
     phoneNumber: '',
-    school: '',
-    employeeId: '',
-    subjects: [],
     temporaryPassword: ''
   });
 
@@ -117,79 +107,66 @@ export default function AdminTeachers() {
         id: '1',
         firstName: 'Jane',
         lastName: 'Mwangi',
-        email: 'jane.mwangi@school.co.ke',
+        email: 'jane.mwangi@email.co.ke',
         phoneNumber: '+254 712 345 678',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12345/2023',
         status: 'active',
         joinDate: '2024-01-15',
         lastLogin: '2024-01-20T08:30:00Z',
         documentsCount: 24,
         approvalDate: '2024-01-15',
         approvedBy: 'Admin User',
-        subjects: ['Mathematics', 'Science'],
         bio: 'Experienced mathematics teacher with focus on primary education'
       },
       {
         id: '2',
         firstName: 'John',
         lastName: 'Kiprotich',
-        email: 'john.kiprotich@school.co.ke',
+        email: 'john.kiprotich@email.co.ke',
         phoneNumber: '+254 720 987 654',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12346/2023',
         status: 'active',
         joinDate: '2024-01-10',
         lastLogin: '2024-01-19T16:45:00Z',
         documentsCount: 18,
         approvalDate: '2024-01-10',
         approvedBy: 'Admin User',
-        subjects: ['English', 'Social Studies'],
-        bio: 'Passionate about language arts and social studies curriculum'
+        bio: 'Dedicated teacher with expertise in language and social studies'
       },
       {
         id: '3',
         firstName: 'Mary',
         lastName: 'Ochieng',
-        email: 'mary.ochieng@school.co.ke',
+        email: 'mary.ochieng@email.co.ke',
         phoneNumber: '+254 731 456 789',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12347/2023',
         status: 'pending',
         joinDate: '2024-01-20',
         documentsCount: 0,
-        subjects: ['Science', 'Physical Education'],
         bio: 'New teacher specializing in science and physical education'
       },
       {
         id: '4',
         firstName: 'David',
         lastName: 'Mwema',
-        email: 'david.mwema@school.co.ke',
+        email: 'david.mwema@email.co.ke',
         phoneNumber: '+254 745 321 098',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12348/2023',
         status: 'suspended',
         joinDate: '2024-01-05',
         lastLogin: '2024-01-18T12:15:00Z',
         documentsCount: 12,
         approvalDate: '2024-01-05',
         approvedBy: 'Admin User',
-        subjects: ['Kiswahili', 'Creative Arts']
+        bio: 'Creative teacher with focus on cultural and artistic education'
       },
       {
         id: '5',
         firstName: 'Sarah',
         lastName: 'Wanjiku',
-        email: 'sarah.wanjiku@school.co.ke',
+        email: 'sarah.wanjiku@email.co.ke',
         phoneNumber: '+254 756 654 321',
-        school: 'Nairobi Primary School',
-        employeeId: 'TSC/12349/2023',
         status: 'rejected',
         joinDate: '2024-01-18',
         documentsCount: 0,
         rejectionReason: 'Incomplete documentation provided',
-        subjects: ['Mathematics']
+        bio: 'Mathematics teacher with strong analytical skills'
       }
     ];
     setTeachers(mockTeachers);
@@ -201,8 +178,7 @@ export default function AdminTeachers() {
     let filtered = teachers.filter(teacher => {
       const matchesSearch = teacher.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            teacher.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           teacher.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           teacher.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
+                           teacher.email.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || teacher.status === statusFilter;
 
@@ -323,9 +299,6 @@ export default function AdminTeachers() {
       lastName: '',
       email: '',
       phoneNumber: '',
-      school: '',
-      employeeId: '',
-      subjects: [],
       temporaryPassword: ''
     });
     setActionSuccess('Teacher added successfully!');
@@ -403,7 +376,7 @@ export default function AdminTeachers() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search teachers by name, email, or TSC number..."
+                  placeholder="Search teachers by name or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -465,10 +438,6 @@ export default function AdminTeachers() {
                           <span>{teacher.phoneNumber}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <School className="h-3 w-3" />
-                          <span className="truncate">{teacher.employeeId}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           <span>{teacher.documentsCount} documents</span>
                         </div>
@@ -487,15 +456,6 @@ export default function AdminTeachers() {
                         )}
                       </div>
                       
-                      {teacher.subjects.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {teacher.subjects.map((subject, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {subject}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -606,30 +566,12 @@ export default function AdminTeachers() {
                   onChange={(e) => setNewTeacher(prev => ({ ...prev, email: e.target.value }))}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input
-                    id="phoneNumber"
-                    value={newTeacher.phoneNumber}
-                    onChange={(e) => setNewTeacher(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="employeeId">TSC Number</Label>
-                  <Input
-                    id="employeeId"
-                    value={newTeacher.employeeId}
-                    onChange={(e) => setNewTeacher(prev => ({ ...prev, employeeId: e.target.value }))}
-                  />
-                </div>
-              </div>
               <div className="space-y-2">
-                <Label htmlFor="school">School</Label>
+                <Label htmlFor="phoneNumber">Phone Number</Label>
                 <Input
-                  id="school"
-                  value={newTeacher.school}
-                  onChange={(e) => setNewTeacher(prev => ({ ...prev, school: e.target.value }))}
+                  id="phoneNumber"
+                  value={newTeacher.phoneNumber}
+                  onChange={(e) => setNewTeacher(prev => ({ ...prev, phoneNumber: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
@@ -687,14 +629,6 @@ export default function AdminTeachers() {
                     <p className="text-sm text-muted-foreground">{selectedTeacher.phoneNumber}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">TSC Number</Label>
-                    <p className="text-sm text-muted-foreground">{selectedTeacher.employeeId}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">School</Label>
-                    <p className="text-sm text-muted-foreground">{selectedTeacher.school}</p>
-                  </div>
-                  <div>
                     <Label className="text-sm font-medium">Documents</Label>
                     <p className="text-sm text-muted-foreground">{selectedTeacher.documentsCount} uploaded</p>
                   </div>
@@ -709,19 +643,6 @@ export default function AdminTeachers() {
                     </div>
                   )}
                 </div>
-
-                {selectedTeacher.subjects.length > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium">Teaching Subjects</Label>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {selectedTeacher.subjects.map((subject, index) => (
-                        <Badge key={index} variant="outline">
-                          {subject}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {selectedTeacher.bio && (
                   <div>

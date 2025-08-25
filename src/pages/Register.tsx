@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Loader2, User, Mail, Phone, School, IdCard, Lock, GraduationCap, CheckCircle } from 'lucide-react';
+import { Loader2, User, Mail, Phone, Lock, GraduationCap, CheckCircle } from 'lucide-react';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -15,8 +15,6 @@ export default function Register() {
     lastName: '',
     email: '',
     phoneNumber: '',
-    school: '',
-    employeeId: '',
     password: '',
     confirmPassword: ''
   });
@@ -159,7 +157,7 @@ export default function Register() {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="john.doe@school.co.ke"
+                    placeholder="john.doe@email.co.ke"
                     value={formData.email}
                     onChange={handleInputChange}
                     className="pl-10"
@@ -179,42 +177,6 @@ export default function Register() {
                     type="tel"
                     placeholder="+254 700 000 000"
                     value={formData.phoneNumber}
-                    onChange={handleInputChange}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* School */}
-              <div className="space-y-2">
-                <Label htmlFor="school">School/Institution</Label>
-                <div className="relative">
-                  <School className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="school"
-                    name="school"
-                    type="text"
-                    placeholder="Nairobi Primary School"
-                    value={formData.school}
-                    onChange={handleInputChange}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Employee ID */}
-              <div className="space-y-2">
-                <Label htmlFor="employeeId">Teacher Service Commission (TSC) Number</Label>
-                <div className="relative">
-                  <IdCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="employeeId"
-                    name="employeeId"
-                    type="text"
-                    placeholder="TSC/12345/2023"
-                    value={formData.employeeId}
                     onChange={handleInputChange}
                     className="pl-10"
                     required
@@ -271,7 +233,7 @@ export default function Register() {
               <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
                 <p>
                   By submitting this form, you acknowledge that your information will be 
-                  verified by school administrators before account activation.
+                  verified by system administrators before account activation.
                 </p>
               </div>
 
