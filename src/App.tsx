@@ -58,136 +58,136 @@ const App = () => (
       <Toaster />
       <Sonner />
       <ThemeProvider>
-        <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            
-            {/* Dashboard Redirect */}
-            <Route path="/" element={<DashboardRouter />} />
-            <Route path="/dashboard" element={<DashboardRouter />} />
-            
-            {/* Teacher Routes */}
-            <Route 
-              path="/teacher/dashboard" 
-              element={
-                <ProtectedRoute requiredRole="teacher">
-                  <TeacherDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/teacher/upload"
-              element={
-                <ProtectedRoute requiredRole="teacher">
-                  <TeacherUpload />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/teacher/documents"
-              element={
-                <ProtectedRoute requiredRole="teacher">
-                  <TeacherDocuments />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/teacher/shared"
-              element={
-                <ProtectedRoute requiredRole="teacher">
-                  <TeacherShared />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/teacher/settings"
-              element={
-                <ProtectedRoute requiredRole="teacher">
-                  <TeacherSettings />
-                </ProtectedRoute>
-              }
-            />
-            
-            {/* Admin Routes */}
-            <Route 
-              path="/admin/dashboard" 
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route
-              path="/admin/teachers"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminTeachers />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/categories"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminCategories />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/documents"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDocuments />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/reports"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminReports />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/activity"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminActivity />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminSettings />
-                </ProtectedRoute>
-              }
-            />
-            
-            {/* Shared Routes */}
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/forgot-password"
-              element={<ForgotPassword />}
-            />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              
+              {/* Dashboard Redirect */}
+              <Route path="/" element={<DashboardRouter />} />
+              <Route path="/dashboard" element={<DashboardRouter />} />
+              
+              {/* Teacher Routes */}
+              <Route 
+                path="/teacher/dashboard" 
+                element={
+                  <ProtectedRoute requiredRole="teacher">
+                    <TeacherDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route
+                path="/teacher/upload"
+                element={
+                  <ProtectedRoute requiredRole="teacher">
+                    <TeacherUpload />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/documents"
+                element={
+                  <ProtectedRoute requiredRole="teacher">
+                    <TeacherDocuments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/shared"
+                element={
+                  <ProtectedRoute requiredRole="teacher">
+                    <TeacherShared />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/settings"
+                element={
+                  <ProtectedRoute requiredRole="teacher">
+                    <TeacherSettings />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Admin Routes */}
+              <Route 
+                path="/admin/dashboard" 
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route
+                path="/admin/teachers"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminTeachers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/categories"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminCategories />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/documents"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminDocuments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/reports"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminReports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/activity"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminActivity />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminSettings />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Shared Routes */}
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={<ForgotPassword />}
+              />
+              
+              {/* Catch-all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
-        </AuthProvider>
       </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>
