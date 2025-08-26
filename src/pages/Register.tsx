@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalSettings } from '../contexts/SettingsContext';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -20,8 +21,9 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  
+
   const { register, isLoading } = useAuth();
+  const { getSiteName } = useGlobalSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,7 +102,7 @@ export default function Register() {
             <GraduationCap className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Teacher Account Request</h1>
-          <p className="text-muted-foreground mt-1">Digital Filing System • Kenya</p>
+          <p className="text-muted-foreground mt-1">{getSiteName()} • Kenya</p>
         </div>
 
         <Card className="shadow-lg border-0">

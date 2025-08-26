@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalSettings } from '../contexts/SettingsContext';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -20,6 +21,7 @@ export default function Login() {
   const [otpMessage, setOtpMessage] = useState('');
   
   const { login, verifyOTP, isLoading } = useAuth();
+  const { getSiteName } = useGlobalSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,7 +44,7 @@ export default function Login() {
         await verifyOTP(formData.email, formData.otp);
 
         toast.success('Login Successful', {
-          description: 'Welcome to the Digital Filing System'
+          description: `Welcome to ${getSiteName()}`
         });
 
         // Redirect based on user role (this will be handled by the App routing)
@@ -68,7 +70,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-xl mb-4">
             <GraduationCap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Digital Filing System</h1>
+          <h1 className="text-2xl font-bold text-foreground">{getSiteName()}</h1>
           <p className="text-muted-foreground mt-1">Teachers Document Management • Kenya</p>
         </div>
 

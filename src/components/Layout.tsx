@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useGlobalSettings } from '../contexts/SettingsContext';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { 
@@ -41,6 +42,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { getSiteName } = useGlobalSettings();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -82,7 +84,7 @@ export default function Layout({ children }: LayoutProps) {
           <GraduationCap className="w-6 h-6 text-primary-foreground" />
         </div>
         <div className="flex flex-col">
-          <span className="font-semibold text-sm">Digital Filing</span>
+          <span className="font-semibold text-sm">{getSiteName()}</span>
           <span className="text-xs text-muted-foreground">Kenya Teachers</span>
         </div>
       </div>

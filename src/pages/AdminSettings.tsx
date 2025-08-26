@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import { useGlobalSettings } from '../contexts/SettingsContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -27,6 +28,8 @@ export default function AdminSettings() {
     updateSystemSettings, 
     updateSecuritySettings 
   } = useSettings('admin');
+  
+  const { refreshSettings } = useGlobalSettings();
   
   // Initialize local state with default values
   const [localSystemSettings, setLocalSystemSettings] = useState({
@@ -84,7 +87,11 @@ export default function AdminSettings() {
         requireAdminApproval: localSystemSettings.requireAdminApproval
       };
 
-      await updateSystemSettings(updatedSettings);
+      const success = await updateSystemSettings(updatedSettings);
+      if (success) {
+        // Refresh global settings to update UI throughout the app
+        await refreshSettings();
+      }
     } catch (error) {
       toast.error('Failed to save system settings');
     }

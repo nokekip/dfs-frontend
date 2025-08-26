@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // Context
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 
 // Components
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -60,6 +61,7 @@ const App = () => (
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
+            <SettingsProvider>
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
@@ -186,6 +188,7 @@ const App = () => (
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </SettingsProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>
