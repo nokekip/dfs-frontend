@@ -5,7 +5,7 @@
 // Base types
 export type UserRole = 'admin' | 'teacher';
 export type TeacherStatus = 'active' | 'pending' | 'suspended';
-export type DocumentStatus = 'draft' | 'published' | 'archived';
+export type DocumentStatus = 'active' | 'flagged' | 'archived';
 export type ActivityAction = 'upload' | 'delete' | 'share' | 'login' | 'register' | 'approve' | 'reject';
 
 // User & Authentication types
