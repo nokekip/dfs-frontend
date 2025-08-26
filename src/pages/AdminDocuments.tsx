@@ -12,7 +12,6 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '../components/ui/dropdown-menu';
-import { Alert, AlertDescription } from '../components/ui/alert';
 import { 
   Dialog,
   DialogContent,
@@ -40,145 +39,38 @@ import {
   Flag,
   Archive
 } from 'lucide-react';
-
-interface Document {
-  id: string;
-  title: string;
-  fileName: string;
-  category: string;
-  class?: string;
-  subject?: string;
-  description?: string;
-  uploadDate: string;
-  fileSize: string;
-  fileType: string;
-  isShared: boolean;
-  downloadCount: number;
-  uploader: string;
-  uploaderName: string;
-  status: 'active' | 'flagged' | 'archived';
-  lastAccessed?: string;
-}
+import { useDocuments } from '../hooks/useDocuments';
+import { useCategories } from '../hooks/useCategories';
+import { useTeachers } from '../hooks/useTeachers';
+import { toast } from 'sonner';
 
 export default function AdminDocuments() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
+  const { documents, isLoading, deleteDocument } = useDocuments();
+  const { categories } = useCategories();
+  const { teachers } = useTeachers();
+  const [filteredDocuments, setFilteredDocuments] = useState(documents);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [uploaderFilter, setUploaderFilter] = useState('all');
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [actionSuccess, setActionSuccess] = useState('');
 
-  // Mock data - in real app, this would come from Django REST API
+  // Initialize filtered documents when documents change
   useEffect(() => {
-    const mockDocuments: Document[] = [
-      {
-        id: '1',
-        title: 'Mathematics Lesson Plan - Week 5',
-        fileName: 'math_lesson_week5.pdf',
-        category: 'Lesson Plans',
-        class: 'Grade 5',
-        subject: 'Mathematics',
-        description: 'Comprehensive lesson plan covering algebra basics',
-        uploadDate: '2024-01-15',
-        fileSize: '2.3 MB',
-        fileType: 'PDF',
-        isShared: false,
-        downloadCount: 12,
-        uploader: 'teacher1',
-        uploaderName: 'Jane Mwangi',
-        status: 'active',
-        lastAccessed: '2024-01-20T10:30:00Z'
-      },
-      {
-        id: '2',
-        title: 'Science Assessment Report',
-        fileName: 'science_assessment_q1.docx',
-        category: 'Assessment Reports',
-        class: 'Grade 6',
-        subject: 'Science',
-        description: 'First quarter science assessment results and analysis',
-        uploadDate: '2024-01-14',
-        fileSize: '1.8 MB',
-        fileType: 'DOCX',
-        isShared: true,
-        downloadCount: 8,
-        uploader: 'teacher2',
-        uploaderName: 'John Kiprotich',
-        status: 'active',
-        lastAccessed: '2024-01-19T16:45:00Z'
-      },
-      {
-        id: '3',
-        title: 'English Literature Study Guide',
-        fileName: 'english_lit_guide.pdf',
-        category: 'Curriculum Materials',
-        class: 'Grade 7',
-        subject: 'English',
-        description: 'Study guide for analyzing literary works',
-        uploadDate: '2024-01-12',
-        fileSize: '3.1 MB',
-        fileType: 'PDF',
-        isShared: false,
-        downloadCount: 15,
-        uploader: 'teacher3',
-        uploaderName: 'Mary Ochieng',
-        status: 'flagged',
-        lastAccessed: '2024-01-18T12:15:00Z'
-      },
-      {
-        id: '4',
-        title: 'Student Progress Report Template',
-        fileName: 'progress_report_template.xlsx',
-        category: 'Administrative Forms',
-        description: 'Standardized template for student progress reporting',
-        uploadDate: '2024-01-10',
-        fileSize: '432 KB',
-        fileType: 'XLSX',
-        isShared: true,
-        downloadCount: 25,
-        uploader: 'teacher1',
-        uploaderName: 'Jane Mwangi',
-        status: 'active',
-        lastAccessed: '2024-01-17T08:30:00Z'
-      },
-      {
-        id: '5',
-        title: 'Physics Experiment Results',
-        fileName: 'physics_experiments.pptx',
-        category: 'Lesson Plans',
-        class: 'Grade 8',
-        subject: 'Science',
-        description: 'Results and analysis of physics experiments conducted',
-        uploadDate: '2024-01-08',
-        fileSize: '4.2 MB',
-        fileType: 'PPTX',
-        isShared: false,
-        downloadCount: 6,
-        uploader: 'teacher4',
-        uploaderName: 'David Mwema',
-        status: 'archived',
-        lastAccessed: '2024-01-15T14:20:00Z'
-      }
-    ];
-    setDocuments(mockDocuments);
-    setFilteredDocuments(mockDocuments);
-  }, []);
+    setFilteredDocuments(documents);
+  }, [documents]);
 
   // Filter documents
   useEffect(() => {
     let filtered = documents.filter(doc => {
       const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           doc.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           doc.uploaderName.toLowerCase().includes(searchQuery.toLowerCase());
+                           doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
+      const matchesCategory = categoryFilter === 'all' || doc.category?.id === categoryFilter;
       const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
-      const matchesUploader = uploaderFilter === 'all' || doc.uploader === uploaderFilter;
+      const matchesUploader = uploaderFilter === 'all' || doc.teacher?.id === uploaderFilter;
 
       return matchesSearch && matchesCategory && matchesStatus && matchesUploader;
     });
@@ -187,13 +79,59 @@ export default function AdminDocuments() {
   }, [documents, searchQuery, categoryFilter, statusFilter, uploaderFilter]);
 
   const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image') || fileType === 'JPG' || fileType === 'PNG') {
+    if (fileType?.includes('image') || fileType === 'JPG' || fileType === 'PNG') {
       return <Image className="h-5 w-5 text-blue-500" />;
     }
-    if (fileType === 'PDF') {
+    if (fileType?.includes('pdf') || fileType === 'PDF') {
       return <FileText className="h-5 w-5 text-red-500" />;
     }
+    if (fileType?.includes('document') || fileType?.includes('word')) {
+      return <FileText className="h-5 w-5 text-blue-600" />;
+    }
     return <File className="h-5 w-5 text-gray-500" />;
+  };
+
+  const getFileTypeDisplay = (fileType: string) => {
+    if (fileType?.includes('pdf')) {
+      return 'PDF';
+    }
+    if (fileType?.includes('document') || fileType?.includes('word')) {
+      return 'DOCX';
+    }
+    if (fileType?.includes('sheet') || fileType?.includes('excel')) {
+      return 'XLSX';
+    }
+    if (fileType?.includes('presentation') || fileType?.includes('powerpoint')) {
+      return 'PPTX';
+    }
+    if (fileType?.includes('image')) {
+      return 'Image';
+    }
+    if (fileType?.includes('text')) {
+      return 'TXT';
+    }
+    return fileType?.split('/')[1]?.toUpperCase() || 'File';
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Invalid Date';
+    try {
+      return new Date(dateString).toLocaleDateString('en-KE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const getStatusBadge = (status: string) => {
@@ -201,108 +139,73 @@ export default function AdminDocuments() {
       case 'active':
         return <Badge className="bg-success/10 text-success border-success/20">Active</Badge>;
       case 'flagged':
-        return <Badge className="bg-warning/10 text-warning border-warning/20">Flagged</Badge>;
+        return <Badge variant="destructive">Flagged</Badge>;
       case 'archived':
-        return <Badge variant="secondary">Archived</Badge>;
+        return <Badge variant="outline">Archived</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{status?.charAt(0).toUpperCase() + status?.slice(1) || 'Unknown'}</Badge>;
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const getCategoryName = (document: any) => {
+    return document.category?.name || 'Unknown Category';
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
+  const getTeacherName = (document: any) => {
+    if (document.teacher?.user) {
+      return `${document.teacher.user.firstName} ${document.teacher.user.lastName}`;
+    }
+    return 'Unknown Teacher';
   };
 
-  const handleDownload = (document: Document) => {
-    console.log('Downloading:', document.fileName);
-    setDocuments(prev => prev.map(doc => 
-      doc.id === document.id 
-        ? { ...doc, downloadCount: doc.downloadCount + 1 }
-        : doc
-    ));
+  const handleViewDocument = (document: any) => {
+    setSelectedDocument(document);
+    setViewDialogOpen(true);
   };
 
-  const handleFlagDocument = (document: Document) => {
-    setDocuments(prev => prev.map(doc => 
-      doc.id === document.id 
-        ? { ...doc, status: doc.status === 'flagged' ? 'active' : 'flagged' }
-        : doc
-    ));
-    setActionSuccess(`Document ${document.status === 'flagged' ? 'unflagged' : 'flagged'} successfully!`);
-    setTimeout(() => setActionSuccess(''), 3000);
-  };
-
-  const handleArchiveDocument = (document: Document) => {
-    setDocuments(prev => prev.map(doc => 
-      doc.id === document.id 
-        ? { ...doc, status: doc.status === 'archived' ? 'active' : 'archived' }
-        : doc
-    ));
-    setActionSuccess(`Document ${document.status === 'archived' ? 'unarchived' : 'archived'} successfully!`);
-    setTimeout(() => setActionSuccess(''), 3000);
-  };
-
-  const handleDeleteDocument = () => {
+  const handleDeleteDocument = async () => {
     if (selectedDocument) {
-      setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
-      setDeleteDialogOpen(false);
-      setSelectedDocument(null);
-      setActionSuccess('Document deleted successfully!');
-      setTimeout(() => setActionSuccess(''), 3000);
+      try {
+        await deleteDocument(selectedDocument.id);
+        setDeleteDialogOpen(false);
+        setSelectedDocument(null);
+        toast.success('Document deleted successfully!');
+      } catch (error) {
+        toast.error('Failed to delete document');
+      }
     }
   };
 
-  const categories = Array.from(new Set(documents.map(doc => doc.category)));
-  const uploaders = Array.from(new Set(documents.map(doc => doc.uploaderName)));
-  
+  const handleFlagDocument = (document: any) => {
+    // In real app, this would call an API to flag/unflag
+    toast.success(`Document ${document.status === 'flagged' ? 'unflagged' : 'flagged'} successfully!`);
+  };
+
+  const handleArchiveDocument = (document: any) => {
+    // In real app, this would call an API to archive/unarchive
+    toast.success(`Document ${document.status === 'archived' ? 'unarchived' : 'archived'} successfully!`);
+  };
+
   const activeDocuments = documents.filter(d => d.status === 'active').length;
   const flaggedDocuments = documents.filter(d => d.status === 'flagged').length;
   const archivedDocuments = documents.filter(d => d.status === 'archived').length;
-  const totalDownloads = documents.reduce((sum, doc) => sum + doc.downloadCount, 0);
+  const totalDownloads = documents.reduce((sum, doc) => sum + (doc.downloadCount || 0), 0);
 
   return (
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold">All Documents</h1>
-          <p className="text-muted-foreground">
-            System-wide document management and monitoring
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Document Management</h1>
+            <p className="text-muted-foreground">
+              Monitor and manage all documents in the system
+            </p>
+          </div>
         </div>
-
-        {/* Success Message */}
-        {actionSuccess && (
-          <Alert className="bg-success/10 border-success/20">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription className="text-success-foreground">
-              {actionSuccess}
-            </AlertDescription>
-          </Alert>
-        )}
 
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{documents.length}</div>
-              <p className="text-xs text-muted-foreground">Total Documents</p>
-            </CardContent>
-          </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-success">{activeDocuments}</div>
@@ -311,8 +214,14 @@ export default function AdminDocuments() {
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-warning">{flaggedDocuments}</div>
+              <div className="text-2xl font-bold text-destructive">{flaggedDocuments}</div>
               <p className="text-xs text-muted-foreground">Flagged Documents</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-muted-foreground">{archivedDocuments}</div>
+              <p className="text-xs text-muted-foreground">Archived Documents</p>
             </CardContent>
           </Card>
           <Card>
@@ -323,56 +232,54 @@ export default function AdminDocuments() {
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Search and Filters */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex flex-col md:flex-row gap-4 items-center">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search documents, descriptions, or uploaders..."
+                  placeholder="Search documents by title or description..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
-              <div className="flex gap-2 flex-wrap">
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="flagged">Flagged</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={uploaderFilter} onValueChange={setUploaderFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Uploader" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Uploaders</SelectItem>
-                    {uploaders.map(uploader => (
-                      <SelectItem key={uploader} value={uploader}>{uploader}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="flagged">Flagged</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={uploaderFilter} onValueChange={setUploaderFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Uploader" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Uploaders</SelectItem>
+                  {teachers.map(teacher => (
+                    <SelectItem key={teacher.id} value={teacher.id}>
+                      {teacher.user.firstName} {teacher.user.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -382,7 +289,7 @@ export default function AdminDocuments() {
           <CardHeader>
             <CardTitle>Documents ({filteredDocuments.length})</CardTitle>
             <CardDescription>
-              Manage all documents uploaded by teachers
+              All documents uploaded by teachers in the system
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -390,44 +297,46 @@ export default function AdminDocuments() {
               {filteredDocuments.map((document) => (
                 <div
                   key={document.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="flex-shrink-0">
+                    <div className="flex items-center gap-2">
                       {getFileIcon(document.fileType)}
+                      <Badge variant="outline" className="text-xs">
+                        {getFileTypeDisplay(document.fileType)}
+                      </Badge>
                     </div>
                     
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium truncate">{document.title}</h3>
                         {getStatusBadge(document.status)}
-                        {document.isShared && (
-                          <Badge variant="outline" className="text-xs">
-                            <Share className="h-3 w-3 mr-1" />
-                            Shared
-                          </Badge>
-                        )}
                       </div>
                       
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {document.description || document.fileName}
-                      </p>
-                      
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3" />
-                          <span>{document.uploaderName}</span>
+                          <span className="truncate">{getTeacherName(document)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          <span>{formatDate(document.uploadDate)}</span>
+                          <span>{formatDate(document.createdAt)}</span>
                         </div>
-                        <span>{document.fileSize}</span>
-                        <span>{document.downloadCount} downloads</span>
-                        {document.class && document.subject && (
-                          <span>{document.class} - {document.subject}</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <Archive className="h-3 w-3" />
+                          <span>{getCategoryName(document)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Download className="h-3 w-3" />
+                          <span>{document.downloadCount || 0} downloads</span>
+                        </div>
                       </div>
+                      
+                      {document.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {document.description}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -439,16 +348,11 @@ export default function AdminDocuments() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={() => {
-                            setSelectedDocument(document);
-                            setViewDialogOpen(true);
-                          }}
-                        >
+                        <DropdownMenuItem onClick={() => handleViewDocument(document)}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownload(document)}>
+                        <DropdownMenuItem>
                           <Download className="h-4 w-4 mr-2" />
                           Download
                         </DropdownMenuItem>
@@ -479,7 +383,7 @@ export default function AdminDocuments() {
           </CardContent>
         </Card>
 
-        {/* Document Details Dialog */}
+        {/* View Document Dialog */}
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -499,46 +403,24 @@ export default function AdminDocuments() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Category</label>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.category}</p>
+                    <p className="text-sm text-muted-foreground">{getCategoryName(selectedDocument)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">File Type</label>
+                    <p className="text-sm text-muted-foreground">{getFileTypeDisplay(selectedDocument.fileType)}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">File Size</label>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.fileSize}</p>
+                    <p className="text-sm text-muted-foreground">{formatFileSize(selectedDocument.fileSize)}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Uploaded By</label>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.uploaderName}</p>
+                    <p className="text-sm text-muted-foreground">{getTeacherName(selectedDocument)}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Upload Date</label>
-                    <p className="text-sm text-muted-foreground">{formatDate(selectedDocument.uploadDate)}</p>
+                    <p className="text-sm text-muted-foreground">{formatDate(selectedDocument.createdAt)}</p>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Downloads</label>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.downloadCount}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Shared</label>
-                    <p className="text-sm text-muted-foreground">{selectedDocument.isShared ? 'Yes' : 'No'}</p>
-                  </div>
-                  {selectedDocument.class && selectedDocument.subject && (
-                    <>
-                      <div>
-                        <label className="text-sm font-medium">Class</label>
-                        <p className="text-sm text-muted-foreground">{selectedDocument.class}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Subject</label>
-                        <p className="text-sm text-muted-foreground">{selectedDocument.subject}</p>
-                      </div>
-                    </>
-                  )}
-                  {selectedDocument.lastAccessed && (
-                    <div className="col-span-2">
-                      <label className="text-sm font-medium">Last Accessed</label>
-                      <p className="text-sm text-muted-foreground">{formatDateTime(selectedDocument.lastAccessed)}</p>
-                    </div>
-                  )}
                 </div>
 
                 {selectedDocument.description && (
@@ -563,8 +445,7 @@ export default function AdminDocuments() {
             <DialogHeader>
               <DialogTitle>Delete Document</DialogTitle>
               <DialogDescription>
-                Are you sure you want to permanently delete "{selectedDocument?.title}"? 
-                This action cannot be undone and will remove the document from all teachers' accounts.
+                Are you sure you want to delete "{selectedDocument?.title}"? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
