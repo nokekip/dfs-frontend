@@ -44,6 +44,9 @@ import {
   UserPlus,
   Trash2
 } from 'lucide-react';
+import { useDocuments } from '../hooks/useDocuments';
+import { useAuth } from '../contexts/AuthContext';
+import { useCategories } from '../hooks/useCategories';
 
 interface SharedDocument {
   id: string;
@@ -79,130 +82,31 @@ interface MySharedDocument {
 }
 
 export default function TeacherShared() {
-  const [sharedWithMe, setSharedWithMe] = useState<SharedDocument[]>([]);
-  const [mySharedFiles, setMySharedFiles] = useState<MySharedDocument[]>([]);
+  const { user } = useAuth();
+  const { documents, isLoading, shareDocument, revokeShare } = useDocuments();
+  const { categories } = useCategories();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
 
-  // Mock data - in real app, this would come from Django REST API
-  useEffect(() => {
-    const mockSharedWithMe: SharedDocument[] = [
-      {
-        id: '1',
-        title: 'Grade 6 Science Curriculum Guide',
-        fileName: 'grade6_science_curriculum.pdf',
-        category: 'Curriculum Materials',
-        class: 'Grade 6',
-        subject: 'Science',
-        description: 'Comprehensive curriculum guide for Grade 6 science topics',
-        fileSize: '3.2 MB',
-        fileType: 'PDF',
-        sharedBy: 'teacher2',
-        sharedByName: 'Mary Ochieng',
-        sharedDate: '2024-01-14',
-        downloadCount: 5,
-        hasAccess: true
-      },
-      {
-        id: '2',
-        title: 'Mathematics Assessment Template',
-        fileName: 'math_assessment_template.xlsx',
-        category: 'Assessment Reports',
-        class: 'Grade 5',
-        subject: 'Mathematics',
-        description: 'Standardized template for mathematics assessments',
-        fileSize: '456 KB',
-        fileType: 'XLSX',
-        sharedBy: 'teacher3',
-        sharedByName: 'John Kiprotich',
-        sharedDate: '2024-01-12',
-        downloadCount: 8,
-        hasAccess: true
-      },
-      {
-        id: '3',
-        title: 'English Grammar Workbook',
-        fileName: 'english_grammar_workbook.pdf',
-        category: 'Lesson Plans',
-        class: 'Grade 4',
-        subject: 'English',
-        description: 'Interactive grammar exercises for Grade 4 students',
-        fileSize: '2.8 MB',
-        fileType: 'PDF',
-        sharedBy: 'teacher4',
-        sharedByName: 'Sarah Wanjiku',
-        sharedDate: '2024-01-10',
-        downloadCount: 12,
-        hasAccess: true
-      },
-      {
-        id: '4',
-        title: 'Parent Meeting Minutes Template',
-        fileName: 'parent_meeting_template.docx',
-        category: 'Administrative Forms',
-        description: 'Template for recording parent-teacher meeting discussions',
-        fileSize: '234 KB',
-        fileType: 'DOCX',
-        sharedBy: 'teacher5',
-        sharedByName: 'David Mwema',
-        sharedDate: '2024-01-08',
-        downloadCount: 3,
-        hasAccess: true
-      }
-    ];
+  // Filter documents shared with me and shared by me
+  const sharedWithMe = documents.filter(doc => 
+    doc.shared_with?.includes(user?.id || '') && doc.uploaded_by !== user?.id
+  );
+  
+  const mySharedFiles = documents.filter(doc => 
+    doc.uploaded_by === user?.id && doc.shared_with && doc.shared_with.length > 0
+  );
 
-    const mockMySharedFiles: MySharedDocument[] = [
-      {
-        id: '1',
-        title: 'Science Experiment Guidelines',
-        fileName: 'science_experiments.pdf',
-        category: 'Lesson Plans',
-        class: 'Grade 7',
-        subject: 'Science',
-        description: 'Step-by-step guidelines for conducting science experiments',
-        fileSize: '1.9 MB',
-        fileType: 'PDF',
-        sharedDate: '2024-01-15',
-        sharedWith: ['teacher2', 'teacher3', 'teacher4'],
-        accessCount: 15,
-        downloadCount: 8
-      },
-      {
-        id: '2',
-        title: 'Student Progress Tracker',
-        fileName: 'progress_tracker.xlsx',
-        category: 'Administrative Forms',
-        description: 'Excel template for tracking student academic progress',
-        fileSize: '678 KB',
-        fileType: 'XLSX',
-        sharedDate: '2024-01-13',
-        sharedWith: ['teacher2', 'teacher5'],
-        accessCount: 12,
-        downloadCount: 6
-      },
-      {
-        id: '3',
-        title: 'Kiswahili Reading Comprehension',
-        fileName: 'kiswahili_comprehension.pdf',
-        category: 'Assessment Reports',
-        class: 'Grade 6',
-        subject: 'Kiswahili',
-        description: 'Reading comprehension exercises in Kiswahili',
-        fileSize: '1.4 MB',
-        fileType: 'PDF',
-        sharedDate: '2024-01-11',
-        sharedWith: ['teacher3'],
-        accessCount: 8,
-        downloadCount: 4
-      }
-    ];
-
-    setSharedWithMe(mockSharedWithMe);
-    setMySharedFiles(mockMySharedFiles);
-  }, []);
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   const getFileIcon = (fileType: string) => {
     if (fileType.includes('image') || fileType === 'JPG' || fileType === 'PNG') {
@@ -222,85 +126,91 @@ export default function TeacherShared() {
     });
   };
 
-  const handleDownload = (document: SharedDocument | MySharedDocument) => {
-    console.log('Downloading:', document.fileName);
+  const handleDownload = (document: any) => {
+    console.log('Downloading:', document.file_name || document.title);
     // In real app, this would trigger actual download
   };
 
-  const handlePreview = (document: SharedDocument | MySharedDocument) => {
-    console.log('Previewing:', document.fileName);
+  const handlePreview = (document: any) => {
+    console.log('Previewing:', document.file_name || document.title);
     // In real app, this would open document in preview modal or new tab
     window.open(`/preview/${document.id}`, '_blank');
   };
 
-  const handleRequestAccess = (document: SharedDocument) => {
+  const handleRequestAccess = (document: any) => {
     console.log('Requesting access to:', document.title);
     // In real app, this would send a request to the document owner
+    toast.success('Access request sent');
   };
 
-  const handleShareMore = (document: MySharedDocument) => {
+  const handleShareMore = (document: any) => {
     setSelectedDocument(document);
     setShareDialogOpen(true);
   };
 
-  const handleShareSubmit = (shareData: any) => {
+  const handleShareSubmit = async (shareData: any) => {
     if (selectedDocument) {
-      console.log('Sharing document with data:', shareData);
+      try {
+        await shareDocument(selectedDocument.id, shareData);
+        
+        let message = `Document "${selectedDocument.title}" shared successfully!`;
+        
+        if (shareData.isPublic) {
+          message += `\nPublic link: ${shareData.publicLink}`;
+        }
 
-      // In real app, this would make API call to share document
-      let message = `Document "${selectedDocument.title}" shared successfully!`;
+        if (shareData.emails.length > 0) {
+          message += `\nShared with: ${shareData.emails.join(', ')}`;
+        }
 
-      if (shareData.isPublic) {
-        message += `\nPublic link: ${shareData.publicLink}`;
+        toast.success('Document Shared Successfully', {
+          description: shareData.isPublic
+            ? `Public link created and ${shareData.emails.length > 0 ? `shared with ${shareData.emails.length} people` : 'ready to share'}`
+            : `Shared with ${shareData.emails.join(', ')}`
+        });
+        setSelectedDocument(null);
+      } catch (error) {
+        toast.error('Failed to share document');
       }
-
-      if (shareData.emails.length > 0) {
-        message += `\nShared with: ${shareData.emails.join(', ')}`;
-      }
-
-      toast.success('Document Shared Successfully', {
-        description: shareData.isPublic
-          ? `Public link created and ${shareData.emails.length > 0 ? `shared with ${shareData.emails.length} people` : 'ready to share'}`
-          : `Shared with ${shareData.emails.join(', ')}`
-      });
-      setSelectedDocument(null);
     }
   };
 
-  const handleRevokeAccess = (document: MySharedDocument) => {
+  const handleRevokeAccess = (document: any) => {
     setSelectedDocument(document);
     setRevokeDialogOpen(true);
   };
 
-  const confirmShare = () => {
-    console.log('Sharing document with more teachers');
-    setShareDialogOpen(false);
-    setSelectedDocument(null);
-  };
-
-  const confirmRevoke = () => {
+  const confirmRevoke = async () => {
     if (selectedDocument) {
-      setMySharedFiles(prev => prev.filter(doc => doc.id !== selectedDocument.id));
-      setRevokeDialogOpen(false);
-      setSelectedDocument(null);
+      try {
+        await revokeShare(selectedDocument.id);
+        setRevokeDialogOpen(false);
+        setSelectedDocument(null);
+        toast.success('Sharing stopped successfully');
+      } catch (error) {
+        toast.error('Failed to stop sharing');
+      }
     }
   };
 
   const filteredSharedWithMe = sharedWithMe.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || doc.category_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const filteredMyShared = mySharedFiles.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || doc.category_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = Array.from(new Set([...sharedWithMe, ...mySharedFiles].map(doc => doc.category)));
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find(cat => cat.id === categoryId);
+    return category?.name || 'Unknown Category';
+  };
 
   return (
     <Layout>
@@ -330,7 +240,7 @@ export default function TeacherShared() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {mySharedFiles.reduce((sum, doc) => sum + doc.sharedWith.length, 0)}
+                {mySharedFiles.reduce((sum, doc) => sum + (doc.shared_with?.length || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">Total Collaborators</p>
             </CardContent>
@@ -338,7 +248,7 @@ export default function TeacherShared() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {mySharedFiles.reduce((sum, doc) => sum + doc.downloadCount, 0)}
+                {mySharedFiles.reduce((sum, doc) => sum + (doc.download_count || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">Total Downloads</p>
             </CardContent>
@@ -365,7 +275,7 @@ export default function TeacherShared() {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map(category => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                    <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

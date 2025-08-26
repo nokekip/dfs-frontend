@@ -25,6 +25,8 @@ import {
   Clock,
   Paperclip
 } from 'lucide-react';
+import { useCategories } from '../hooks/useCategories';
+import { useDocuments } from '../hooks/useDocuments';
 
 interface UploadFile {
   id: string;
@@ -39,25 +41,11 @@ interface UploadFile {
   error?: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  requiresClassSubject: boolean;
-}
-
 export default function TeacherUpload() {
+  const { categories, loading: categoriesLoading } = useCategories();
+  const { uploadDocument } = useDocuments();
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
-  const [categories] = useState<Category[]>([
-    { id: '1', name: 'Lesson Plans', requiresClassSubject: true },
-    { id: '2', name: 'Assessment Reports', requiresClassSubject: true },
-    { id: '3', name: 'Student Records', requiresClassSubject: true },
-    { id: '4', name: 'Administrative Forms', requiresClassSubject: false },
-    { id: '5', name: 'Professional Development', requiresClassSubject: false },
-    { id: '6', name: 'Meeting Minutes', requiresClassSubject: false },
-    { id: '7', name: 'Curriculum Materials', requiresClassSubject: true },
-    { id: '8', name: 'Parent Communication', requiresClassSubject: false },
-  ]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -187,23 +175,55 @@ export default function TeacherUpload() {
       file.id === fileData.id ? { ...file, status: 'uploading', progress: 0 } : file
     ));
 
-    // Simulate upload progress
-    const progressInterval = setInterval(() => {
-      setUploadFiles(prev => prev.map(file => {
-        if (file.id === fileData.id && file.status === 'uploading') {
-          const newProgress = Math.min(file.progress + Math.random() * 30, 100);
-          if (newProgress >= 100) {
-            clearInterval(progressInterval);
-            toast.success('Upload Complete', {
-              description: `${fileData.title} has been uploaded successfully`
-            });
-            return { ...file, progress: 100, status: 'completed' };
+    try {
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadFiles(prev => prev.map(file => {
+          if (file.id === fileData.id && file.status === 'uploading') {
+            const newProgress = Math.min(file.progress + Math.random() * 30, 90);
+            return { ...file, progress: newProgress };
           }
-          return { ...file, progress: newProgress };
-        }
-        return file;
-      }));
-    }, 200);
+          return file;
+        }));
+      }, 200);
+
+      // Create document object for upload
+      const documentData = {
+        title: fileData.title,
+        description: fileData.description,
+        category_id: fileData.category,
+        class_level: fileData.class || null,
+        subject: fileData.subject || null,
+        file_type: fileData.file.type,
+        file_size: fileData.file.size,
+        file_name: fileData.file.name
+      };
+
+      // Upload through our API
+      await uploadDocument(documentData, fileData.file);
+
+      // Complete the progress
+      clearInterval(progressInterval);
+      setUploadFiles(prev => prev.map(file => 
+        file.id === fileData.id ? { ...file, progress: 100, status: 'completed' } : file
+      ));
+
+      toast.success('Upload Complete', {
+        description: `${fileData.title} has been uploaded successfully`
+      });
+    } catch (error) {
+      setUploadFiles(prev => prev.map(file => 
+        file.id === fileData.id ? { 
+          ...file, 
+          status: 'error', 
+          error: 'Upload failed. Please try again.' 
+        } : file
+      ));
+
+      toast.error('Upload Failed', {
+        description: `Failed to upload ${fileData.title}`
+      });
+    }
   };
 
   const uploadAllFiles = async () => {
@@ -236,7 +256,7 @@ export default function TeacherUpload() {
   const canUploadFile = (file: UploadFile) => {
     const category = getSelectedCategory(file.category);
     return file.title && file.category && file.status !== 'error' && 
-           (!category?.requiresClassSubject || (file.class && file.subject));
+           (!category?.requires_class_subject || (file.class && file.subject));
   };
 
   const readyToUploadCount = uploadFiles.filter(canUploadFile).length;
@@ -418,7 +438,7 @@ export default function TeacherUpload() {
                             </Select>
                           </div>
 
-                          {category?.requiresClassSubject && (
+                          {category?.requires_class_subject && (
                             <>
                               <div className="space-y-2">
                                 <Label>Class *</Label>
