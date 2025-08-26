@@ -211,6 +211,7 @@ const INITIAL_DOCUMENTS: Document[] = [
     classLevel: 'Grade 4',
     subject: 'Mathematics',
     isShared: true,
+    sharedWith: ['teacher-2', 'teacher-3'], // Shared with other teachers
     sharedAt: '2024-01-18T00:00:00Z',
     downloadCount: 23,
     status: 'active',
@@ -231,6 +232,7 @@ const INITIAL_DOCUMENTS: Document[] = [
     classLevel: 'Grade 5',
     subject: 'Science',
     isShared: true,
+    sharedWith: ['teacher-1', 'teacher-3'], // Shared with other teachers
     sharedAt: '2024-01-17T00:00:00Z',
     downloadCount: 18,
     status: 'flagged',
@@ -251,6 +253,7 @@ const INITIAL_DOCUMENTS: Document[] = [
     classLevel: 'Grade 6',
     subject: 'History',
     isShared: false,
+    sharedWith: [], // Not shared
     sharedAt: null,
     downloadCount: 5,
     status: 'archived',

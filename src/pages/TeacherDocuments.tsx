@@ -7,6 +7,8 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
+import { useDocuments } from '../hooks/useDocuments';
+import { Document } from '../services/types';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -68,8 +70,8 @@ type SortField = 'title' | 'uploadDate' | 'fileSize' | 'category';
 type SortDirection = 'asc' | 'desc';
 
 export default function TeacherDocuments() {
-  const [documents, setDocuments] = useState<DocumentFile[]>([]);
-  const [filteredDocuments, setFilteredDocuments] = useState<DocumentFile[]>([]);
+  const { documents, shareDocument, deleteDocument } = useDocuments();
+  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedClass, setSelectedClass] = useState('all');
@@ -77,103 +79,9 @@ export default function TeacherDocuments() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortField, setSortField] = useState<SortField>('uploadDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [selectedDocument, setSelectedDocument] = useState<DocumentFile | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
-
-  // Mock data - in real app, this would come from Django REST API
-  useEffect(() => {
-    const mockDocuments: DocumentFile[] = [
-      {
-        id: '1',
-        title: 'Mathematics Lesson Plan - Week 5',
-        fileName: 'math_lesson_week5.pdf',
-        category: 'Lesson Plans',
-        class: 'Grade 5',
-        subject: 'Mathematics',
-        description: 'Comprehensive lesson plan covering algebra basics',
-        uploadDate: '2024-01-15',
-        fileSize: '2.3 MB',
-        fileType: 'PDF',
-        isShared: false,
-        downloadCount: 12,
-        lastModified: '2024-01-15'
-      },
-      {
-        id: '2',
-        title: 'Science Assessment Report',
-        fileName: 'science_assessment_q1.docx',
-        category: 'Assessment Reports',
-        class: 'Grade 6',
-        subject: 'Science',
-        description: 'First quarter science assessment results and analysis',
-        uploadDate: '2024-01-14',
-        fileSize: '1.8 MB',
-        fileType: 'DOCX',
-        isShared: true,
-        downloadCount: 8,
-        lastModified: '2024-01-16'
-      },
-      {
-        id: '3',
-        title: 'English Literature Study Guide',
-        fileName: 'english_lit_guide.pdf',
-        category: 'Curriculum Materials',
-        class: 'Grade 7',
-        subject: 'English',
-        description: 'Study guide for analyzing literary works',
-        uploadDate: '2024-01-12',
-        fileSize: '3.1 MB',
-        fileType: 'PDF',
-        isShared: false,
-        downloadCount: 15,
-        lastModified: '2024-01-12'
-      },
-      {
-        id: '4',
-        title: 'Student Progress Report Template',
-        fileName: 'progress_report_template.xlsx',
-        category: 'Administrative Forms',
-        description: 'Standardized template for student progress reporting',
-        uploadDate: '2024-01-10',
-        fileSize: '432 KB',
-        fileType: 'XLSX',
-        isShared: true,
-        downloadCount: 25,
-        lastModified: '2024-01-11'
-      },
-      {
-        id: '5',
-        title: 'Physics Experiment Results',
-        fileName: 'physics_experiments.pptx',
-        category: 'Lesson Plans',
-        class: 'Grade 8',
-        subject: 'Science',
-        description: 'Results and analysis of physics experiments conducted',
-        uploadDate: '2024-01-08',
-        fileSize: '4.2 MB',
-        fileType: 'PPTX',
-        isShared: false,
-        downloadCount: 6,
-        lastModified: '2024-01-09'
-      },
-      {
-        id: '6',
-        title: 'Parent-Teacher Conference Notes',
-        fileName: 'ptc_notes_jan2024.docx',
-        category: 'Parent Communication',
-        description: 'Summary of parent-teacher conference discussions',
-        uploadDate: '2024-01-05',
-        fileSize: '890 KB',
-        fileType: 'DOCX',
-        isShared: false,
-        downloadCount: 3,
-        lastModified: '2024-01-05'
-      }
-    ];
-    setDocuments(mockDocuments);
-    setFilteredDocuments(mockDocuments);
-  }, []);
 
   // Filter and sort documents
   useEffect(() => {
@@ -182,8 +90,8 @@ export default function TeacherDocuments() {
                            doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            doc.fileName.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
-      const matchesClass = selectedClass === 'all' || doc.class === selectedClass;
+      const matchesCategory = selectedCategory === 'all' || doc.category.name === selectedCategory;
+      const matchesClass = selectedClass === 'all' || doc.classLevel === selectedClass;
       const matchesSubject = selectedSubject === 'all' || doc.subject === selectedSubject;
 
       return matchesSearch && matchesCategory && matchesClass && matchesSubject;
@@ -194,12 +102,13 @@ export default function TeacherDocuments() {
       let aValue: any = a[sortField];
       let bValue: any = b[sortField];
 
-      if (sortField === 'uploadDate' || sortField === 'lastModified') {
+      if (sortField === 'uploadDate') {
         aValue = new Date(aValue);
         bValue = new Date(bValue);
       } else if (sortField === 'fileSize') {
-        aValue = parseFloat(aValue.replace(/[^0-9.]/g, ''));
-        bValue = parseFloat(bValue.replace(/[^0-9.]/g, ''));
+        // fileSize is a number in Document interface
+        aValue = aValue;
+        bValue = bValue;
       }
 
       if (sortDirection === 'asc') {
@@ -230,6 +139,14 @@ export default function TeacherDocuments() {
     });
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -239,85 +156,102 @@ export default function TeacherDocuments() {
     }
   };
 
-  const handleDownload = (document: DocumentFile) => {
+  const handleDownload = (doc: Document) => {
     // In real app, this would trigger actual download
-    console.log('Downloading:', document.fileName);
+    console.log('Downloading:', doc.fileName);
 
     // Simulate download
-    const link = document.createElement('a');
+    const link = window.document.createElement('a');
     link.href = '#'; // In real app, this would be the actual file URL
-    link.download = document.fileName;
+    link.download = doc.fileName;
     link.click();
 
-    // Update download count
-    setDocuments(prev => prev.map(doc =>
-      doc.id === document.id
-        ? { ...doc, downloadCount: doc.downloadCount + 1 }
-        : doc
-    ));
-
     toast.success('Download Started', {
-      description: `${document.fileName} is being downloaded`
+      description: `${doc.fileName} is being downloaded`
     });
   };
 
-  const handlePreview = (document: DocumentFile) => {
+  const handlePreview = (document: Document) => {
     // In real app, this would open document in preview modal or new tab
     console.log('Previewing:', document.fileName);
     window.open(`/preview/${document.id}`, '_blank');
   };
 
-  const handleShare = (document: DocumentFile) => {
+  const handleShare = (document: Document) => {
     setSelectedDocument(document);
     setShareDialogOpen(true);
   };
 
-  const handleDelete = (document: DocumentFile) => {
+  const handleUnshare = async (document: Document) => {
+    try {
+      await shareDocument(document.id, false);
+      toast.success('Document Unshared', {
+        description: `"${document.title}" is now private.`,
+      });
+    } catch (error) {
+      toast.error('Failed to unshare document');
+    }
+  };
+
+  const handleDelete = (document: Document) => {
     setSelectedDocument(document);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedDocument) {
-      setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
-      setDeleteDialogOpen(false);
-      setSelectedDocument(null);
+      try {
+        await deleteDocument(selectedDocument.id);
+        setDeleteDialogOpen(false);
+        setSelectedDocument(null);
+        toast.success('File Deleted', {
+          description: `${selectedDocument.fileName} has been deleted`
+        });
+      } catch (error) {
+        toast.error('Delete Failed', {
+          description: 'Failed to delete the document'
+        });
+      }
     }
   };
 
-  const handleShareSubmit = (shareData: any) => {
+  const handleShareSubmit = async (shareData: any) => {
     if (selectedDocument) {
       console.log('Sharing document with data:', shareData);
 
-      // Update document sharing status
-      setDocuments(prev => prev.map(doc =>
-        doc.id === selectedDocument.id
-          ? { ...doc, isShared: shareData.isPublic || shareData.emails.length > 0 }
-          : doc
-      ));
+      try {
+        // Call the hook's shareDocument function to update the document status
+        const isShared = shareData.isPublic || shareData.emails.length > 0;
+        await shareDocument(selectedDocument.id, isShared);
 
-      // In real app, this would make API call to share document
-      let message = `Document "${selectedDocument.title}" shared successfully!`;
+        // Show custom success message with details
+        let message = `Document "${selectedDocument.title}" shared successfully!`;
 
-      if (shareData.isPublic) {
-        message += `\nPublic link: ${shareData.publicLink}`;
+        if (shareData.isPublic) {
+          message += `\nPublic link: ${shareData.publicLink}`;
+        }
+
+        if (shareData.emails.length > 0) {
+          message += `\nShared with: ${shareData.emails.join(', ')}`;
+        }
+
+        toast.success('Document Shared Successfully', {
+          description: shareData.isPublic
+            ? `Public link created and ${shareData.emails.length > 0 ? `shared with ${shareData.emails.length} people` : 'ready to share'}`
+            : `Shared with ${shareData.emails.join(', ')}`
+        });
+        
+        setSelectedDocument(null);
+      } catch (error) {
+        toast.error('Share Failed', {
+          description: 'Failed to share the document. Please try again.'
+        });
       }
-
-      if (shareData.emails.length > 0) {
-        message += `\nShared with: ${shareData.emails.join(', ')}`;
-      }
-
-      toast.success('Document Shared Successfully', {
-        description: shareData.isPublic
-          ? `Public link created and ${shareData.emails.length > 0 ? `shared with ${shareData.emails.length} people` : 'ready to share'}`
-          : `Shared with ${shareData.emails.join(', ')}`
-      });
-      setSelectedDocument(null);
     }
   };
 
-  const categories = Array.from(new Set(documents.map(doc => doc.category)));
-  const classes = Array.from(new Set(documents.map(doc => doc.class).filter(Boolean)));
+  const categories = Array.from(new Set(documents.map(doc => doc.category.name)));
+  const classes = Array.from(new Set(documents.map(doc => doc.classLevel).filter(Boolean)));
   const subjects = Array.from(new Set(documents.map(doc => doc.subject).filter(Boolean)));
 
   return (
@@ -490,10 +424,17 @@ export default function TeacherDocuments() {
                           <Eye className="h-4 w-4 mr-2" />
                           Preview
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleShare(document)}>
-                          <Share className="h-4 w-4 mr-2" />
-                          {document.isShared ? 'Unshare' : 'Share'}
-                        </DropdownMenuItem>
+                        {document.isShared ? (
+                          <DropdownMenuItem onClick={() => handleUnshare(document)}>
+                            <Share className="h-4 w-4 mr-2" />
+                            Unshare
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleShare(document)}>
+                            <Share className="h-4 w-4 mr-2" />
+                            Share
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => handleDelete(document)}
@@ -514,11 +455,11 @@ export default function TeacherDocuments() {
                     
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-xs">
-                        {document.category}
+                        {document.category.name}
                       </Badge>
-                      {document.class && document.subject && (
+                      {document.classLevel && document.subject && (
                         <Badge variant="secondary" className="text-xs">
-                          {document.class} - {document.subject}
+                          {document.classLevel} - {document.subject}
                         </Badge>
                       )}
                       {document.isShared && (
@@ -530,8 +471,8 @@ export default function TeacherDocuments() {
                     </div>
 
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{document.fileSize}</span>
-                      <span>{formatDate(document.uploadDate)}</span>
+                      <span>{formatFileSize(document.fileSize)}</span>
+                      <span>{formatDate(document.createdAt)}</span>
                     </div>
                     
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -602,19 +543,19 @@ export default function TeacherDocuments() {
                               <p className="text-xs text-muted-foreground">
                                 {document.fileName}
                               </p>
-                              {document.class && document.subject && (
+                              {document.classLevel && document.subject && (
                                 <p className="text-xs text-muted-foreground">
-                                  {document.class} - {document.subject}
+                                  {document.classLevel} - {document.subject}
                                 </p>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="p-4">
-                          <Badge variant="outline">{document.category}</Badge>
+                          <Badge variant="outline">{document.category.name}</Badge>
                         </td>
-                        <td className="p-4 text-sm">{document.fileSize}</td>
-                        <td className="p-4 text-sm">{formatDate(document.uploadDate)}</td>
+                        <td className="p-4 text-sm">{formatFileSize(document.fileSize)}</td>
+                        <td className="p-4 text-sm">{formatDate(document.createdAt)}</td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
                             {document.isShared && (

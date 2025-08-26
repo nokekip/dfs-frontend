@@ -25,6 +25,7 @@ interface DocumentsActions {
   uploadDocument: (data: DocumentCreateRequest) => Promise<boolean>;
   updateDocument: (documentId: string, data: DocumentUpdateRequest) => Promise<boolean>;
   shareDocument: (documentId: string, isShared: boolean) => Promise<boolean>;
+  revokeShare: (documentId: string) => Promise<boolean>;
   deleteDocument: (documentId: string) => Promise<boolean>;
   downloadDocument: (documentId: string) => Promise<boolean>;
   refresh: () => void;
@@ -224,6 +225,54 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     }
   }, []);
 
+  const revokeShare = useCallback(async (documentId: string): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      // Set the document to not shared and clear shared users
+      const data: DocumentShareRequest = { isShared: false };
+      const response = await apiClient.shareDocument(documentId, data);
+      
+      if (response.success && response.data) {
+        // Update the document in the local state
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.map(doc => 
+            doc.id === documentId 
+              ? { ...response.data!, sharedWith: [] } // Clear shared users
+              : doc
+          ),
+          isLoading: false,
+        }));
+
+        toast.success('Sharing Revoked', {
+          description: 'Document sharing has been stopped successfully.',
+        });
+
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof ApiError 
+        ? error.message 
+        : 'Failed to revoke sharing. Please try again.';
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+
+      toast.error('Revoke Failed', {
+        description: errorMessage,
+      });
+
+      return false;
+    }
+  }, []);
+
   const deleteDocument = useCallback(async (documentId: string): Promise<boolean> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -323,6 +372,7 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     uploadDocument,
     updateDocument,
     shareDocument,
+    revokeShare,
     deleteDocument,
     downloadDocument,
     refresh,

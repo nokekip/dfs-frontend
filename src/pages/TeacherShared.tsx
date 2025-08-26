@@ -48,39 +48,6 @@ import { useDocuments } from '../hooks/useDocuments';
 import { useAuth } from '../contexts/AuthContext';
 import { useCategories } from '../hooks/useCategories';
 
-interface SharedDocument {
-  id: string;
-  title: string;
-  fileName: string;
-  category: string;
-  class?: string;
-  subject?: string;
-  description?: string;
-  fileSize: string;
-  fileType: string;
-  sharedBy: string;
-  sharedByName: string;
-  sharedDate: string;
-  downloadCount: number;
-  hasAccess: boolean;
-}
-
-interface MySharedDocument {
-  id: string;
-  title: string;
-  fileName: string;
-  category: string;
-  class?: string;
-  subject?: string;
-  description?: string;
-  fileSize: string;
-  fileType: string;
-  sharedDate: string;
-  sharedWith: string[];
-  accessCount: number;
-  downloadCount: number;
-}
-
 export default function TeacherShared() {
   const { user } = useAuth();
   const { documents, isLoading, shareDocument, revokeShare } = useDocuments();
@@ -93,11 +60,11 @@ export default function TeacherShared() {
 
   // Filter documents shared with me and shared by me
   const sharedWithMe = documents.filter(doc => 
-    doc.shared_with?.includes(user?.id || '') && doc.uploaded_by !== user?.id
+    doc.sharedWith?.includes(user?.id || '') && doc.teacher?.user?.id !== user?.id
   );
   
   const mySharedFiles = documents.filter(doc => 
-    doc.uploaded_by === user?.id && doc.shared_with && doc.shared_with.length > 0
+    doc.teacher?.user?.id === user?.id && doc.sharedWith && doc.sharedWith.length > 0
   );
 
   const formatFileSize = (bytes: number) => {
@@ -196,14 +163,14 @@ export default function TeacherShared() {
   const filteredSharedWithMe = sharedWithMe.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category_id === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || doc.category.id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const filteredMyShared = mySharedFiles.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category_id === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || doc.category.id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -240,7 +207,7 @@ export default function TeacherShared() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {mySharedFiles.reduce((sum, doc) => sum + (doc.shared_with?.length || 0), 0)}
+                {mySharedFiles.reduce((sum, doc) => sum + (doc.sharedWith?.length || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">Total Collaborators</p>
             </CardContent>
@@ -248,7 +215,7 @@ export default function TeacherShared() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {mySharedFiles.reduce((sum, doc) => sum + (doc.download_count || 0), 0)}
+                {mySharedFiles.reduce((sum, doc) => sum + (doc.downloadCount || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">Total Downloads</p>
             </CardContent>
@@ -327,23 +294,14 @@ export default function TeacherShared() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              {document.hasAccess ? (
-                                <>
-                                  <DropdownMenuItem onClick={() => handleDownload(document)}>
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handlePreview(document)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Preview
-                                  </DropdownMenuItem>
-                                </>
-                              ) : (
-                                <DropdownMenuItem onClick={() => handleRequestAccess(document)}>
-                                  <Mail className="h-4 w-4 mr-2" />
-                                  Request Access
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem onClick={() => handleDownload(document)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePreview(document)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Preview
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -360,13 +318,13 @@ export default function TeacherShared() {
                         <div className="flex items-center gap-2">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-xs">
-                              {document.sharedByName.split(' ').map(n => n[0]).join('')}
+                              {document.teacher.user.firstName[0]}{document.teacher.user.lastName[0]}
                             </AvatarFallback>
                           </Avatar>
                           <div className="text-sm">
-                            <p className="font-medium">{document.sharedByName}</p>
+                            <p className="font-medium">{document.teacher.user.firstName} {document.teacher.user.lastName}</p>
                             <p className="text-muted-foreground text-xs">
-                              Shared {formatDate(document.sharedDate)}
+                              Shared {formatDate(document.sharedAt || document.createdAt)}
                             </p>
                           </div>
                         </div>
@@ -374,33 +332,26 @@ export default function TeacherShared() {
                         {/* Category and Class/Subject */}
                         <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary" className="text-xs">
-                            {document.category}
+                            {document.category.name}
                           </Badge>
-                          {document.class && document.subject && (
+                          {document.classLevel && document.subject && (
                             <Badge variant="outline" className="text-xs">
-                              {document.class} - {document.subject}
+                              {document.classLevel} - {document.subject}
                             </Badge>
                           )}
                         </div>
 
                         {/* File Info */}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{document.fileSize}</span>
+                          <span>{formatFileSize(document.fileSize)}</span>
                           <span>{document.downloadCount} downloads</span>
                         </div>
 
                         {/* Access Status */}
-                        {document.hasAccess ? (
-                          <div className="flex items-center gap-2 text-xs text-success">
-                            <CheckCircle className="h-3 w-3" />
-                            <span>Access granted</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-xs text-warning">
-                            <Clock className="h-3 w-3" />
-                            <span>Access pending</span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 text-xs text-success">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Access granted</span>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -486,11 +437,11 @@ export default function TeacherShared() {
                         {/* Category and Class/Subject */}
                         <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary" className="text-xs">
-                            {document.category}
+                            {document.category.name}
                           </Badge>
-                          {document.class && document.subject && (
+                          {document.classLevel && document.subject && (
                             <Badge variant="outline" className="text-xs">
-                              {document.class} - {document.subject}
+                              {document.classLevel} - {document.subject}
                             </Badge>
                           )}
                         </div>
@@ -506,7 +457,7 @@ export default function TeacherShared() {
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span className="text-muted-foreground">
-                              Shared {formatDate(document.sharedDate)}
+                              Shared {formatDate(document.sharedAt || document.createdAt)}
                             </span>
                           </div>
                         </div>
@@ -514,8 +465,8 @@ export default function TeacherShared() {
                         {/* Stats */}
                         <div className="grid grid-cols-2 gap-4 text-center p-2 bg-muted/50 rounded-lg">
                           <div>
-                            <div className="text-lg font-semibold">{document.accessCount}</div>
-                            <div className="text-xs text-muted-foreground">Views</div>
+                            <div className="text-lg font-semibold">{document.sharedWith.length}</div>
+                            <div className="text-xs text-muted-foreground">Shared</div>
                           </div>
                           <div>
                             <div className="text-lg font-semibold">{document.downloadCount}</div>
@@ -525,7 +476,7 @@ export default function TeacherShared() {
 
                         {/* File Info */}
                         <div className="text-xs text-muted-foreground text-center">
-                          {document.fileSize}
+                          {formatFileSize(document.fileSize)}
                         </div>
                       </div>
                     </CardContent>

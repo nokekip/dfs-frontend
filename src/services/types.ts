@@ -125,6 +125,7 @@ export interface Document {
   classLevel?: string;
   subject?: string;
   isShared: boolean;
+  sharedWith: string[]; // Array of user IDs who have access
   sharedAt?: string;
   downloadCount: number;
   status: DocumentStatus;

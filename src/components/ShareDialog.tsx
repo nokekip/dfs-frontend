@@ -23,19 +23,10 @@ import {
   CheckCircle,
   Plus
 } from 'lucide-react';
-
-interface DocumentFile {
-  id: string;
-  title: string;
-  fileName: string;
-  category: string;
-  class?: string;
-  subject?: string;
-  isShared: boolean;
-}
+import { Document } from '../services/types';
 
 interface ShareDialogProps {
-  document: DocumentFile | null;
+  document: Document | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onShare: (shareData: ShareData) => void;
@@ -75,12 +66,12 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
     } catch (err) {
       console.error('Failed to copy:', err);
       // Fallback for older browsers
-      const textArea = document.createElement('textarea');
+      const textArea = window.document.createElement('textarea');
       textArea.value = text;
-      document.body.appendChild(textArea);
+      window.document.body.appendChild(textArea);
       textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
+      window.document.execCommand('copy');
+      window.document.body.removeChild(textArea);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
       toast.success('Link Copied', {
