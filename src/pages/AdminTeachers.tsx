@@ -50,8 +50,12 @@ import {
   Users,
   Activity,
   Pause,
-  Play
+  Play,
+  Loader2
 } from 'lucide-react';
+import { useTeachers } from '../hooks/useTeachers';
+import { useDocuments } from '../hooks/useDocuments';
+import { toast } from 'sonner';
 
 interface Teacher {
   id: string;
@@ -78,7 +82,8 @@ interface NewTeacherData {
 }
 
 export default function AdminTeachers() {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const { teachers, isLoading, approveTeacher, updateTeacher } = useTeachers();
+  const { documents } = useDocuments();
   const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -90,7 +95,6 @@ export default function AdminTeachers() {
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [suspensionReason, setSuspensionReason] = useState('');
-  const [actionSuccess, setActionSuccess] = useState('');
 
   const [newTeacher, setNewTeacher] = useState<NewTeacherData>({
     firstName: '',
@@ -102,83 +106,15 @@ export default function AdminTeachers() {
 
   // Mock data - in real app, this would come from Django REST API
   useEffect(() => {
-    const mockTeachers: Teacher[] = [
-      {
-        id: '1',
-        firstName: 'Jane',
-        lastName: 'Mwangi',
-        email: 'jane.mwangi@email.co.ke',
-        phoneNumber: '+254 712 345 678',
-        status: 'active',
-        joinDate: '2024-01-15',
-        lastLogin: '2024-01-20T08:30:00Z',
-        documentsCount: 24,
-        approvalDate: '2024-01-15',
-        approvedBy: 'Admin User',
-        bio: 'Experienced mathematics teacher with focus on primary education'
-      },
-      {
-        id: '2',
-        firstName: 'John',
-        lastName: 'Kiprotich',
-        email: 'john.kiprotich@email.co.ke',
-        phoneNumber: '+254 720 987 654',
-        status: 'active',
-        joinDate: '2024-01-10',
-        lastLogin: '2024-01-19T16:45:00Z',
-        documentsCount: 18,
-        approvalDate: '2024-01-10',
-        approvedBy: 'Admin User',
-        bio: 'Dedicated teacher with expertise in language and social studies'
-      },
-      {
-        id: '3',
-        firstName: 'Mary',
-        lastName: 'Ochieng',
-        email: 'mary.ochieng@email.co.ke',
-        phoneNumber: '+254 731 456 789',
-        status: 'pending',
-        joinDate: '2024-01-20',
-        documentsCount: 0,
-        bio: 'New teacher specializing in science and physical education'
-      },
-      {
-        id: '4',
-        firstName: 'David',
-        lastName: 'Mwema',
-        email: 'david.mwema@email.co.ke',
-        phoneNumber: '+254 745 321 098',
-        status: 'suspended',
-        joinDate: '2024-01-05',
-        lastLogin: '2024-01-18T12:15:00Z',
-        documentsCount: 12,
-        approvalDate: '2024-01-05',
-        approvedBy: 'Admin User',
-        bio: 'Creative teacher with focus on cultural and artistic education'
-      },
-      {
-        id: '5',
-        firstName: 'Sarah',
-        lastName: 'Wanjiku',
-        email: 'sarah.wanjiku@email.co.ke',
-        phoneNumber: '+254 756 654 321',
-        status: 'rejected',
-        joinDate: '2024-01-18',
-        documentsCount: 0,
-        rejectionReason: 'Incomplete documentation provided',
-        bio: 'Mathematics teacher with strong analytical skills'
-      }
-    ];
-    setTeachers(mockTeachers);
-    setFilteredTeachers(mockTeachers);
-  }, []);
+    setFilteredTeachers(teachers);
+  }, [teachers]);
 
   // Filter teachers based on search and status
   useEffect(() => {
     let filtered = teachers.filter(teacher => {
-      const matchesSearch = teacher.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           teacher.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           teacher.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = teacher.user?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           teacher.user?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           teacher.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || teacher.status === statusFilter;
 
@@ -226,17 +162,20 @@ export default function AdminTeachers() {
     setApproveDialogOpen(true);
   };
 
-  const confirmApproval = () => {
+  const confirmApproval = async () => {
     if (selectedTeacher) {
-      setTeachers(prev => prev.map(teacher => 
-        teacher.id === selectedTeacher.id 
-          ? { ...teacher, status: 'active', approvalDate: new Date().toISOString(), approvedBy: 'Admin User' }
-          : teacher
-      ));
-      setApproveDialogOpen(false);
-      setSelectedTeacher(null);
-      setActionSuccess('Teacher approved successfully!');
-      setTimeout(() => setActionSuccess(''), 3000);
+      try {
+        await updateTeacher(selectedTeacher.id, { 
+          status: 'active',
+          approval_date: new Date().toISOString(),
+          approved_by: 'Admin User'
+        });
+        setApproveDialogOpen(false);
+        setSelectedTeacher(null);
+        toast.success('Teacher approved successfully!');
+      } catch (error) {
+        toast.error('Failed to approve teacher');
+      }
     }
   };
 
@@ -245,18 +184,20 @@ export default function AdminTeachers() {
     setRejectDialogOpen(true);
   };
 
-  const confirmRejection = () => {
+  const confirmRejection = async () => {
     if (selectedTeacher && rejectionReason.trim()) {
-      setTeachers(prev => prev.map(teacher => 
-        teacher.id === selectedTeacher.id 
-          ? { ...teacher, status: 'rejected', rejectionReason }
-          : teacher
-      ));
-      setRejectDialogOpen(false);
-      setSelectedTeacher(null);
-      setRejectionReason('');
-      setActionSuccess('Teacher account rejected');
-      setTimeout(() => setActionSuccess(''), 3000);
+      try {
+        await updateTeacher(selectedTeacher.id, { 
+          status: 'rejected',
+          rejection_reason: rejectionReason
+        });
+        setRejectDialogOpen(false);
+        setSelectedTeacher(null);
+        setRejectionReason('');
+        toast.success('Teacher account rejected');
+      } catch (error) {
+        toast.error('Failed to reject teacher');
+      }
     }
   };
 
@@ -265,49 +206,57 @@ export default function AdminTeachers() {
     setSuspendDialogOpen(true);
   };
 
-  const confirmSuspension = () => {
+  const confirmSuspension = async () => {
     if (selectedTeacher) {
-      const newStatus = selectedTeacher.status === 'suspended' ? 'active' : 'suspended';
-      setTeachers(prev => prev.map(teacher => 
-        teacher.id === selectedTeacher.id 
-          ? { ...teacher, status: newStatus }
-          : teacher
-      ));
-      setSuspendDialogOpen(false);
-      setSelectedTeacher(null);
-      setSuspensionReason('');
-      setActionSuccess(`Teacher ${newStatus === 'suspended' ? 'suspended' : 'reactivated'} successfully!`);
-      setTimeout(() => setActionSuccess(''), 3000);
+      try {
+        const newStatus = selectedTeacher.status === 'suspended' ? 'active' : 'suspended';
+        await updateTeacher(selectedTeacher.id, { status: newStatus });
+        setSuspendDialogOpen(false);
+        setSelectedTeacher(null);
+        setSuspensionReason('');
+        toast.success(`Teacher ${newStatus === 'suspended' ? 'suspended' : 'reactivated'} successfully!`);
+      } catch (error) {
+        toast.error('Failed to update teacher status');
+      }
     }
   };
 
-  const handleAddTeacher = () => {
-    const newTeacherData: Teacher = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...newTeacher,
-      status: 'active',
-      joinDate: new Date().toISOString(),
-      documentsCount: 0,
-      approvalDate: new Date().toISOString(),
-      approvedBy: 'Admin User'
-    };
+  const handleAddTeacher = async () => {
+    try {
+      const teacherData = {
+        first_name: newTeacher.firstName,
+        last_name: newTeacher.lastName,
+        email: newTeacher.email,
+        phone_number: newTeacher.phoneNumber,
+        temporary_password: newTeacher.temporaryPassword,
+        status: 'active',
+        approval_date: new Date().toISOString(),
+        approved_by: 'Admin User'
+      };
 
-    setTeachers(prev => [...prev, newTeacherData]);
-    setAddTeacherDialogOpen(false);
-    setNewTeacher({
-      firstName: '',
-      lastName: '',
-      email: '',
-      phoneNumber: '',
-      temporaryPassword: ''
-    });
-    setActionSuccess('Teacher added successfully!');
-    setTimeout(() => setActionSuccess(''), 3000);
+      await addTeacher(teacherData);
+      setAddTeacherDialogOpen(false);
+      setNewTeacher({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        temporaryPassword: ''
+      });
+      toast.success('Teacher added successfully!');
+    } catch (error) {
+      toast.error('Failed to add teacher');
+    }
   };
 
   const generatePassword = () => {
     const password = Math.random().toString(36).slice(-10);
     setNewTeacher(prev => ({ ...prev, temporaryPassword: password }));
+  };
+
+  // Calculate document counts per teacher
+  const getTeacherDocumentCount = (teacherId: string) => {
+    return documents.filter(doc => doc.teacher?.id === teacherId).length;
   };
 
   const activeTeachers = teachers.filter(t => t.status === 'active').length;
@@ -332,14 +281,7 @@ export default function AdminTeachers() {
         </div>
 
         {/* Success Message */}
-        {actionSuccess && (
-          <Alert className="bg-success/10 border-success/20">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription className="text-success-foreground">
-              {actionSuccess}
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* Success messages are now handled by toast notifications */}
 
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -407,7 +349,19 @@ export default function AdminTeachers() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span>Loading teachers...</span>
+                </div>
+              </div>
+            ) : filteredTeachers.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No teachers found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
               {filteredTeachers.map((teacher) => (
                 <div
                   key={teacher.id}
@@ -416,14 +370,14 @@ export default function AdminTeachers() {
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary/10 text-primary">
-                        {teacher.firstName[0]}{teacher.lastName[0]}
+                        {teacher.user?.firstName?.[0]}{teacher.user?.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium">
-                          {teacher.firstName} {teacher.lastName}
+                          {teacher.user?.firstName} {teacher.user?.lastName}
                         </h3>
                         {getStatusBadge(teacher.status)}
                       </div>
@@ -431,7 +385,7 @@ export default function AdminTeachers() {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Mail className="h-3 w-3" />
-                          <span className="truncate">{teacher.email}</span>
+                          <span className="truncate">{teacher.user?.email}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -439,19 +393,19 @@ export default function AdminTeachers() {
                         </div>
                         <div className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
-                          <span>{teacher.documentsCount} documents</span>
+                          <span>{teacher.documentsCount || 0} documents</span>
                         </div>
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          <span>Joined {formatDate(teacher.joinDate)}</span>
+                          <span>Joined {formatDate(teacher.createdAt)}</span>
                         </div>
-                        {teacher.lastLogin && (
+                        {teacher.last_login && (
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span>Last login {formatDateTime(teacher.lastLogin)}</span>
+                            <span>Last login {formatDateTime(teacher.last_login)}</span>
                           </div>
                         )}
                       </div>
@@ -526,6 +480,7 @@ export default function AdminTeachers() {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -611,14 +566,14 @@ export default function AdminTeachers() {
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
                     <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                      {selectedTeacher.firstName[0]}{selectedTeacher.lastName[0]}
+                      {selectedTeacher.user.firstName?.[0]}{selectedTeacher.user.lastName?.[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="text-lg font-semibold">
-                      {selectedTeacher.firstName} {selectedTeacher.lastName}
+                      {selectedTeacher.user.firstName} {selectedTeacher.user.lastName}
                     </h3>
-                    <p className="text-muted-foreground">{selectedTeacher.email}</p>
+                    <p className="text-muted-foreground">{selectedTeacher.user.email}</p>
                     {getStatusBadge(selectedTeacher.status)}
                   </div>
                 </div>
@@ -626,15 +581,15 @@ export default function AdminTeachers() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium">Phone Number</Label>
-                    <p className="text-sm text-muted-foreground">{selectedTeacher.phoneNumber}</p>
+                    <p className="text-sm text-muted-foreground">{selectedTeacher.phoneNumber || 'Not provided'}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Documents</Label>
-                    <p className="text-sm text-muted-foreground">{selectedTeacher.documentsCount} uploaded</p>
+                    <p className="text-sm text-muted-foreground">{getTeacherDocumentCount(selectedTeacher.id)} uploaded</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Join Date</Label>
-                    <p className="text-sm text-muted-foreground">{formatDate(selectedTeacher.joinDate)}</p>
+                    <p className="text-sm text-muted-foreground">{formatDate(selectedTeacher.createdAt)}</p>
                   </div>
                   {selectedTeacher.lastLogin && (
                     <div>
@@ -673,7 +628,7 @@ export default function AdminTeachers() {
             <DialogHeader>
               <DialogTitle>Approve Teacher Account</DialogTitle>
               <DialogDescription>
-                Are you sure you want to approve the account for {selectedTeacher?.firstName} {selectedTeacher?.lastName}? 
+                Are you sure you want to approve the account for {selectedTeacher?.first_name} {selectedTeacher?.last_name}? 
                 They will gain full access to the system.
               </DialogDescription>
             </DialogHeader>
@@ -695,7 +650,7 @@ export default function AdminTeachers() {
             <DialogHeader>
               <DialogTitle>Reject Teacher Account</DialogTitle>
               <DialogDescription>
-                Please provide a reason for rejecting {selectedTeacher?.firstName} {selectedTeacher?.lastName}'s account.
+                Please provide a reason for rejecting {selectedTeacher?.first_name} {selectedTeacher?.last_name}'s account.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -735,8 +690,8 @@ export default function AdminTeachers() {
               </DialogTitle>
               <DialogDescription>
                 {selectedTeacher?.status === 'suspended' 
-                  ? `Are you sure you want to reactivate ${selectedTeacher?.firstName} ${selectedTeacher?.lastName}'s account?`
-                  : `Are you sure you want to suspend ${selectedTeacher?.firstName} ${selectedTeacher?.lastName}'s account?`
+                  ? `Are you sure you want to reactivate ${selectedTeacher?.first_name} ${selectedTeacher?.last_name}'s account?`
+                  : `Are you sure you want to suspend ${selectedTeacher?.first_name} ${selectedTeacher?.last_name}'s account?`
                 }
               </DialogDescription>
             </DialogHeader>
