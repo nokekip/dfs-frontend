@@ -213,7 +213,7 @@ const INITIAL_DOCUMENTS: Document[] = [
     isShared: true,
     sharedAt: '2024-01-18T00:00:00Z',
     downloadCount: 23,
-    status: 'published',
+    status: 'active',
     tags: ['mathematics', 'fractions', 'grade4'],
     createdAt: '2024-01-15T10:30:00Z',
     updatedAt: '2024-01-18T00:00:00Z',
@@ -233,10 +233,30 @@ const INITIAL_DOCUMENTS: Document[] = [
     isShared: true,
     sharedAt: '2024-01-17T00:00:00Z',
     downloadCount: 18,
-    status: 'published',
+    status: 'flagged',
     tags: ['science', 'assessment', 'template'],
     createdAt: '2024-01-14T16:45:00Z',
     updatedAt: '2024-01-17T00:00:00Z',
+  },
+  {
+    id: 'doc-3',
+    title: 'Archived History Worksheet',
+    description: 'Old worksheet about World War 2 for Grade 6',
+    category: INITIAL_CATEGORIES[2],
+    teacher: INITIAL_TEACHERS[0],
+    fileName: 'history-ww2-worksheet.pdf',
+    fileSize: 1536000, // 1.5MB
+    fileType: 'application/pdf',
+    filePath: '/uploads/documents/history-ww2-worksheet.pdf',
+    classLevel: 'Grade 6',
+    subject: 'History',
+    isShared: false,
+    sharedAt: null,
+    downloadCount: 5,
+    status: 'archived',
+    tags: ['history', 'ww2', 'grade6'],
+    createdAt: '2024-01-10T09:20:00Z',
+    updatedAt: '2024-01-12T00:00:00Z',
   },
 ];
 
@@ -490,6 +510,12 @@ export class MockDataStore {
       localStorage.removeItem(key);
     });
     this.initializeData();
+  }
+
+  // Refresh only documents data
+  refreshDocuments(): void {
+    localStorage.removeItem(STORAGE_KEYS.DOCUMENTS);
+    this.saveDocuments(INITIAL_DOCUMENTS);
   }
 }
 
