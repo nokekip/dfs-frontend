@@ -10,7 +10,7 @@ interface AuthContextType {
   verifyOTP: (email: string, otp: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
-  updateUser: (userData: Partial<User>) => void;
+  updateUser: (userData: Partial<User>) => Promise<void>;
 }
 
 interface RegisterData {
@@ -62,8 +62,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     authHook.logout();
   };
 
-  const updateUser = (userData: Partial<User>) => {
-    authHook.updateProfile(userData);
+  const updateUser = async (userData: Partial<User>) => {
+    await authHook.updateProfile(userData);
+    // Force refresh the user data to ensure UI updates
+    authHook.refreshUser();
   };
 
   const value: AuthContextType = {

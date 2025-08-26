@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import UserAvatar from '../components/UserAvatar';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   DropdownMenu, 
@@ -443,11 +443,11 @@ export default function AdminTeachers() {
                   className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {teacher.user?.firstName?.[0]}{teacher.user?.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar 
+                      user={teacher.user} 
+                      size="xl" 
+                      fallbackClassName="bg-primary/10 text-primary"
+                    />
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">

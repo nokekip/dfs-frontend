@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import Layout from '../components/Layout';
+import UserAvatar from '../components/UserAvatar';
 import { Loading } from '../components/Loading';
 import { ErrorMessage } from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
@@ -9,7 +10,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { toast } from 'sonner';
@@ -60,6 +60,16 @@ export default function Profile() {
     }
   }, [user]);
 
+  // Update profile data when user.profilePicture changes specifically
+  useEffect(() => {
+    if (user?.profilePicture !== profileData.profilePicture) {
+      setProfileData(prev => ({
+        ...prev,
+        profilePicture: user?.profilePicture
+      }));
+    }
+  }, [user?.profilePicture]);
+
   // Fetch dashboard stats on component mount
   useEffect(() => {
     fetchDashboardStats();
@@ -98,12 +108,16 @@ export default function Profile() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // In real app, this would upload to server
-        const imageUrl = URL.createObjectURL(file);
-        setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
-        toast.success('Photo Updated', {
-          description: 'Profile photo has been updated successfully'
-        });
+        // Convert to base64 for better persistence
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imageUrl = e.target?.result as string;
+          setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
+          toast.success('Photo Updated', {
+            description: 'Profile photo has been updated successfully'
+          });
+        };
+        reader.readAsDataURL(file);
       }
     };
     input.click();
@@ -184,14 +198,16 @@ export default function Profile() {
               <CardContent className="space-y-6">
                 {/* Profile Picture */}
                 <div className="flex items-center gap-6">
-                  <Avatar className="h-20 w-20">
-                    {profileData.profilePicture && (
-                      <AvatarImage src={profileData.profilePicture} alt="Profile" />
-                    )}
-                    <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                      {profileData.firstName[0]}{profileData.lastName[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar 
+                    key={profileData.profilePicture || 'no-picture'}
+                    user={{
+                      ...user!,
+                      firstName: profileData.firstName,
+                      lastName: profileData.lastName,
+                      profilePicture: profileData.profilePicture
+                    }}
+                    size="xl"
+                  />
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={handleChangePhoto}>

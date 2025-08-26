@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useGlobalSettings } from '../contexts/SettingsContext';
 import { Button } from './ui/button';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import UserAvatar from './UserAvatar';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -92,11 +92,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* User Info */}
       <div className="px-6 py-4 border-b bg-muted/30">
         <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-primary text-primary-foreground">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar user={user} size="lg" />
           <div className="flex flex-col">
             <span className="font-medium text-sm">
               {user?.firstName} {user?.lastName}
@@ -219,11 +215,7 @@ export default function Layout({ children }: LayoutProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                      {user?.firstName?.[0]}{user?.lastName?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar user={user} size="md" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>

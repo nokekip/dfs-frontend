@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Layout from '../components/Layout';
@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../components/ui/switch';
 import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
+import UserAvatar from '../components/UserAvatar';
 import { 
   Dialog,
   DialogContent,
@@ -76,6 +76,7 @@ export default function TeacherSettings() {
     email: user?.email || '',
     phoneNumber: '+254 712 345 678',
     bio: 'Passionate educator with 8 years of experience in primary education.',
+    profilePicture: user?.profilePicture || undefined,
   });
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
@@ -98,13 +99,27 @@ export default function TeacherSettings() {
   const [saveSuccess, setSaveSuccess] = useState('');
   const [saveError, setSaveError] = useState('');
 
+  // Sync local state with user changes
+  useEffect(() => {
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        profilePicture: user.profilePicture || undefined,
+      }));
+    }
+  }, [user]);
+
   const handleProfileSave = async () => {
     try {
-      // In real app, this would update via Django REST API
-      updateUser({
+      // Update the user in AuthContext with all profile data including profile picture
+      await updateUser({
         firstName: profileData.firstName,
         lastName: profileData.lastName,
         email: profileData.email,
+        profilePicture: profileData.profilePicture,
       });
       
       toast.success('Profile Updated', {
@@ -162,25 +177,52 @@ export default function TeacherSettings() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // In real app, this would upload to server
-        const imageUrl = URL.createObjectURL(file);
-        setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
-        toast.success('Photo Updated', {
-          description: 'Profile photo has been updated successfully'
-        });
+        try {
+          // Create object URL for the image
+          const imageUrl = URL.createObjectURL(file);
+          
+          // Update local state
+          setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
+          
+          // Update user in AuthContext immediately
+          await updateUser({
+            profilePicture: imageUrl,
+          });
+          
+          toast.success('Photo Updated', {
+            description: 'Profile photo has been updated successfully'
+          });
+        } catch (error) {
+          toast.error('Photo Update Failed', {
+            description: 'Failed to update profile photo. Please try again.'
+          });
+        }
       }
     };
     input.click();
   };
 
-  const handleRemovePhoto = () => {
-    setProfileData(prev => ({ ...prev, profilePicture: undefined }));
-    toast.success('Photo Removed', {
-      description: 'Profile photo has been removed successfully'
-    });
+  const handleRemovePhoto = async () => {
+    try {
+      // Update local state
+      setProfileData(prev => ({ ...prev, profilePicture: undefined }));
+      
+      // Update user in AuthContext immediately
+      await updateUser({
+        profilePicture: undefined,
+      });
+      
+      toast.success('Photo Removed', {
+        description: 'Profile photo has been removed successfully'
+      });
+    } catch (error) {
+      toast.error('Photo Removal Failed', {
+        description: 'Failed to remove profile photo. Please try again.'
+      });
+    }
   };
 
   return (
@@ -236,14 +278,11 @@ export default function TeacherSettings() {
               <CardContent className="space-y-6">
                 {/* Profile Picture */}
                 <div className="flex items-center gap-6">
-                  <Avatar className="h-20 w-20">
-                    {profileData.profilePicture && (
-                      <AvatarImage src={profileData.profilePicture} alt="Profile" />
-                    )}
-                    <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                      {profileData.firstName[0]}{profileData.lastName[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar 
+                    user={user} 
+                    size="xl" 
+                    key={user?.profilePicture} 
+                  />
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={handleChangePhoto}>
