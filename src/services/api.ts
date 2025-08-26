@@ -349,11 +349,15 @@ export class ApiClient {
       teacher.approvedBy = adminUser.id;
       teacher.approvedAt = new Date().toISOString();
       teacher.rejectionReason = undefined;
+      teacher.rejectedBy = undefined;
+      teacher.rejectedAt = undefined;
     } else {
-      teacher.status = 'pending';
+      teacher.status = 'rejected';
       teacher.rejectedBy = adminUser.id;
       teacher.rejectedAt = new Date().toISOString();
       teacher.rejectionReason = data.rejectionReason;
+      teacher.approvedBy = undefined;
+      teacher.approvedAt = undefined;
     }
     
     teacher.updatedAt = new Date().toISOString();
@@ -374,6 +378,162 @@ export class ApiClient {
       success: true,
       data: teacher,
       message: `Teacher ${data.approved ? 'approved' : 'rejected'} successfully`,
+    };
+  }
+
+  async createTeacher(data: TeacherCreateRequest): Promise<ApiResponse<Teacher>> {
+    await delay();
+
+    const adminUser = this.requireRole('admin');
+    const users = mockDataStore.getUsers();
+
+    // Check if email already exists
+    if (users.some(u => u.email === data.user.email)) {
+      simulateError('Email already registered', 400);
+    }
+
+    const newUser: User = {
+      id: mockDataStore.generateId(),
+      email: data.user.email,
+      firstName: data.user.firstName,
+      lastName: data.user.lastName,
+      role: 'teacher',
+      isActive: true, // Admin-created teachers are active by default
+      dateJoined: new Date().toISOString(),
+    };
+
+    // Create teacher profile
+    const newTeacher: Teacher = {
+      id: mockDataStore.generateId(),
+      user: newUser,
+      status: 'active',
+      phoneNumber: data.phoneNumber,
+      documentsCount: 0,
+      sharedDocumentsCount: 0,
+      totalDownloads: 0,
+      approvedBy: adminUser.id,
+      approvedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Add password to credentials (in real app this would be hashed)
+    // TODO: For now we skip credential storage since it's not implemented in mockDataStore
+    // In a real app, this would store the hashed password in the database
+    
+    users.push(newUser);
+    const teachers = mockDataStore.getTeachers();
+    teachers.push(newTeacher);
+
+    mockDataStore.saveUsers(users);
+    mockDataStore.saveTeachers(teachers);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user: adminUser,
+      action: 'create',
+      targetType: 'teacher',
+      targetId: newTeacher.id,
+      targetName: `${newTeacher.user.firstName} ${newTeacher.user.lastName}`,
+      description: `created teacher account for ${newTeacher.user.firstName} ${newTeacher.user.lastName}`,
+    });
+
+    return {
+      success: true,
+      data: newTeacher,
+      message: 'Teacher created successfully',
+    };
+  }
+
+  async updateTeacher(teacherId: string, data: TeacherUpdateRequest): Promise<ApiResponse<Teacher>> {
+    await delay();
+
+    const adminUser = this.requireRole('admin');
+    const teachers = mockDataStore.getTeachers();
+    const teacherIndex = teachers.findIndex(t => t.id === teacherId);
+
+    if (teacherIndex === -1) {
+      simulateError('Teacher not found', 404);
+    }
+
+    const teacher = teachers[teacherIndex];
+    
+    // Update the teacher properties
+    if (data.phoneNumber !== undefined) {
+      teacher.phoneNumber = data.phoneNumber;
+    }
+    if (data.bio !== undefined) {
+      teacher.bio = data.bio;
+    }
+    if (data.status !== undefined) {
+      teacher.status = data.status;
+    }
+    
+    teacher.updatedAt = new Date().toISOString();
+    teachers[teacherIndex] = teacher;
+    mockDataStore.saveTeachers(teachers);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user: adminUser,
+      action: 'update',
+      targetType: 'teacher',
+      targetId: teacher.id,
+      targetName: `${teacher.user.firstName} ${teacher.user.lastName}`,
+      description: `updated teacher account for ${teacher.user.firstName} ${teacher.user.lastName}`,
+    });
+
+    return {
+      success: true,
+      data: teacher,
+      message: 'Teacher updated successfully',
+    };
+  }
+
+  async deleteTeacher(teacherId: string): Promise<ApiResponse<void>> {
+    await delay();
+
+    const adminUser = this.requireRole('admin');
+    const teachers = mockDataStore.getTeachers();
+    const teacherIndex = teachers.findIndex(t => t.id === teacherId);
+
+    if (teacherIndex === -1) {
+      simulateError('Teacher not found', 404);
+    }
+
+    const teacher = teachers[teacherIndex];
+    
+    // Remove teacher from teachers array
+    teachers.splice(teacherIndex, 1);
+    mockDataStore.saveTeachers(teachers);
+
+    // Also remove the associated user
+    const users = mockDataStore.getUsers();
+    const userIndex = users.findIndex(u => u.id === teacher.user.id);
+    if (userIndex !== -1) {
+      users.splice(userIndex, 1);
+      mockDataStore.saveUsers(users);
+    }
+
+    // Remove all documents uploaded by this teacher
+    const documents = mockDataStore.getDocuments();
+    const updatedDocuments = documents.filter(doc => doc.teacher.id !== teacherId);
+    mockDataStore.saveDocuments(updatedDocuments);
+
+    // Log activity
+    mockDataStore.addActivityLog({
+      user: adminUser,
+      action: 'delete',
+      targetType: 'teacher',
+      targetId: teacher.id,
+      targetName: `${teacher.user.firstName} ${teacher.user.lastName}`,
+      description: `deleted teacher account for ${teacher.user.firstName} ${teacher.user.lastName}`,
+    });
+
+    return {
+      success: true,
+      data: undefined,
+      message: 'Teacher deleted successfully',
     };
   }
 

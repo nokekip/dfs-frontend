@@ -4,9 +4,9 @@
 
 // Base types
 export type UserRole = 'admin' | 'teacher';
-export type TeacherStatus = 'active' | 'pending' | 'suspended';
+export type TeacherStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 export type DocumentStatus = 'active' | 'flagged' | 'archived';
-export type ActivityAction = 'upload' | 'delete' | 'share' | 'login' | 'register' | 'approve' | 'reject';
+export type ActivityAction = 'upload' | 'delete' | 'share' | 'login' | 'register' | 'approve' | 'reject' | 'create' | 'update';
 
 // User & Authentication types
 export interface User {
@@ -93,6 +93,7 @@ export interface TeacherUpdateRequest {
   phoneNumber?: string;
   bio?: string;
   profilePicture?: File;
+  status?: TeacherStatus;
 }
 
 export interface TeacherApprovalRequest {

@@ -20,6 +20,8 @@ interface TeachersState {
 
 interface TeachersActions {
   fetchTeachers: () => Promise<void>;
+  addTeacher: (data: TeacherCreateRequest) => Promise<boolean>;
+  deleteTeacher: (teacherId: string) => Promise<boolean>;
   approveTeacher: (teacherId: string, approved: boolean, rejectionReason?: string) => Promise<boolean>;
   updateTeacher: (teacherId: string, data: TeacherUpdateRequest) => Promise<boolean>;
   refresh: () => void;
@@ -66,6 +68,100 @@ export const useTeachers = (): TeachersState & TeachersActions => {
       toast.error('Fetch Failed', {
         description: errorMessage,
       });
+    }
+  }, []);
+
+  const addTeacher = useCallback(async (
+    data: TeacherCreateRequest
+  ): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await apiClient.createTeacher(data);
+      
+      if (response.success && response.data) {
+        // Add the new teacher to the local state
+        setState(prev => {
+          const updatedTeachers = [...prev.teachers, response.data!];
+          return {
+            ...prev,
+            teachers: updatedTeachers,
+            isLoading: false,
+          };
+        });
+
+        toast.success('Teacher Added', {
+          description: `${response.data.user.firstName} ${response.data.user.lastName} has been added successfully.`,
+        });
+
+        // Also refresh the data to ensure consistency
+        fetchTeachers();
+
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof ApiError 
+        ? error.message 
+        : 'Failed to add teacher. Please try again.';
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+
+      toast.error('Add Teacher Failed', {
+        description: errorMessage,
+      });
+
+      return false;
+    }
+  }, []);
+
+  const deleteTeacher = useCallback(async (
+    teacherId: string
+  ): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await apiClient.deleteTeacher(teacherId);
+      
+      if (response.success) {
+        // Remove the teacher from the local state
+        setState(prev => ({
+          ...prev,
+          teachers: prev.teachers.filter(teacher => teacher.id !== teacherId),
+          isLoading: false,
+        }));
+
+        toast.success('Teacher Deleted', {
+          description: 'Teacher account has been permanently deleted.',
+        });
+
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof ApiError 
+        ? error.message 
+        : 'Failed to delete teacher. Please try again.';
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+
+      toast.error('Delete Teacher Failed', {
+        description: errorMessage,
+      });
+
+      return false;
     }
   }, []);
 
@@ -137,15 +233,27 @@ export const useTeachers = (): TeachersState & TeachersActions => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Note: This would be implemented when we add the update teacher endpoint
-      // For now, we'll just show a success message
+      const response = await apiClient.updateTeacher(teacherId, data);
       
-      toast.success('Teacher Updated', {
-        description: 'Teacher information has been updated successfully.',
-      });
+      if (response.success && response.data) {
+        // Update the teacher in the local state
+        setState(prev => ({
+          ...prev,
+          teachers: prev.teachers.map(teacher => 
+            teacher.id === teacherId ? response.data! : teacher
+          ),
+          isLoading: false,
+        }));
+
+        toast.success('Teacher Updated', {
+          description: 'Teacher information has been updated successfully.',
+        });
+
+        return true;
+      }
 
       setState(prev => ({ ...prev, isLoading: false }));
-      return true;
+      return false;
     } catch (error) {
       const errorMessage = error instanceof ApiError 
         ? error.message 
@@ -181,6 +289,8 @@ export const useTeachers = (): TeachersState & TeachersActions => {
   return {
     ...state,
     fetchTeachers,
+    addTeacher,
+    deleteTeacher,
     approveTeacher,
     updateTeacher,
     refresh,

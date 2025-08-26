@@ -56,21 +56,14 @@ import {
 import { useTeachers } from '../hooks/useTeachers';
 import { useDocuments } from '../hooks/useDocuments';
 import { toast } from 'sonner';
+import { Teacher } from '../services/types';
 
-interface Teacher {
-  id: string;
+interface NewTeacherData {
   firstName: string;
   lastName: string;
   email: string;
   phoneNumber: string;
-  status: 'active' | 'pending' | 'suspended' | 'rejected';
-  joinDate: string;
-  lastLogin?: string;
-  documentsCount: number;
-  approvalDate?: string;
-  approvedBy?: string;
-  rejectionReason?: string;
-  bio?: string;
+  temporaryPassword: string;
 }
 
 interface NewTeacherData {
@@ -82,7 +75,7 @@ interface NewTeacherData {
 }
 
 export default function AdminTeachers() {
-  const { teachers, isLoading, approveTeacher, updateTeacher } = useTeachers();
+  const { teachers, isLoading, addTeacher, deleteTeacher, approveTeacher, updateTeacher } = useTeachers();
   const { documents } = useDocuments();
   const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,6 +86,7 @@ export default function AdminTeachers() {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [suspensionReason, setSuspensionReason] = useState('');
 
@@ -163,19 +157,24 @@ export default function AdminTeachers() {
   };
 
   const confirmApproval = async () => {
-    if (selectedTeacher) {
-      try {
-        await updateTeacher(selectedTeacher.id, { 
-          status: 'active',
-          approval_date: new Date().toISOString(),
-          approved_by: 'Admin User'
-        });
+    if (!selectedTeacher) {
+      toast.error('No teacher selected');
+      return;
+    }
+    
+    try {
+      const success = await approveTeacher(selectedTeacher.id, true);
+      
+      if (success) {
         setApproveDialogOpen(false);
         setSelectedTeacher(null);
-        toast.success('Teacher approved successfully!');
-      } catch (error) {
+        // Success message is already shown by the hook
+      } else {
         toast.error('Failed to approve teacher');
       }
+    } catch (error) {
+      console.error('Error approving teacher:', error);
+      toast.error('Failed to approve teacher');
     }
   };
 
@@ -185,19 +184,30 @@ export default function AdminTeachers() {
   };
 
   const confirmRejection = async () => {
-    if (selectedTeacher && rejectionReason.trim()) {
-      try {
-        await updateTeacher(selectedTeacher.id, { 
-          status: 'rejected',
-          rejection_reason: rejectionReason
-        });
+    if (!selectedTeacher) {
+      toast.error('No teacher selected');
+      return;
+    }
+    
+    if (!rejectionReason.trim()) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
+    
+    try {
+      const success = await approveTeacher(selectedTeacher.id, false, rejectionReason.trim());
+      
+      if (success) {
         setRejectDialogOpen(false);
         setSelectedTeacher(null);
         setRejectionReason('');
-        toast.success('Teacher account rejected');
-      } catch (error) {
+        // Success message is already shown by the hook
+      } else {
         toast.error('Failed to reject teacher');
       }
+    } catch (error) {
+      console.error('Error rejecting teacher:', error);
+      toast.error('Failed to reject teacher');
     }
   };
 
@@ -222,36 +232,101 @@ export default function AdminTeachers() {
   };
 
   const handleAddTeacher = async () => {
+    // Validate required fields
+    if (!newTeacher.firstName.trim()) {
+      toast.error('First name is required');
+      return;
+    }
+    
+    if (!newTeacher.lastName.trim()) {
+      toast.error('Last name is required');
+      return;
+    }
+    
+    if (!newTeacher.email.trim()) {
+      toast.error('Email is required');
+      return;
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newTeacher.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    
+    if (!newTeacher.temporaryPassword.trim()) {
+      toast.error('Temporary password is required');
+      return;
+    }
+    
+    if (newTeacher.temporaryPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
     try {
       const teacherData = {
-        first_name: newTeacher.firstName,
-        last_name: newTeacher.lastName,
-        email: newTeacher.email,
-        phone_number: newTeacher.phoneNumber,
-        temporary_password: newTeacher.temporaryPassword,
-        status: 'active',
-        approval_date: new Date().toISOString(),
-        approved_by: 'Admin User'
+        user: {
+          firstName: newTeacher.firstName.trim(),
+          lastName: newTeacher.lastName.trim(),
+          email: newTeacher.email.trim(),
+          password: newTeacher.temporaryPassword
+        },
+        phoneNumber: newTeacher.phoneNumber?.trim() || undefined
       };
 
-      await addTeacher(teacherData);
-      setAddTeacherDialogOpen(false);
-      setNewTeacher({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phoneNumber: '',
-        temporaryPassword: ''
-      });
-      toast.success('Teacher added successfully!');
+      const success = await addTeacher(teacherData);
+      
+      if (success) {
+        setAddTeacherDialogOpen(false);
+        setNewTeacher({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phoneNumber: '',
+          temporaryPassword: ''
+        });
+        // Success message is already shown by the hook
+      } else {
+        toast.error('Failed to add teacher. Please try again.');
+      }
     } catch (error) {
-      toast.error('Failed to add teacher');
+      console.error('Error adding teacher:', error);
+      toast.error('Failed to add teacher. Please try again.');
     }
   };
 
   const generatePassword = () => {
     const password = Math.random().toString(36).slice(-10);
     setNewTeacher(prev => ({ ...prev, temporaryPassword: password }));
+  };
+
+  const handleDeleteTeacher = (teacher: Teacher) => {
+    setSelectedTeacher(teacher);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedTeacher) {
+      toast.error('No teacher selected');
+      return;
+    }
+    
+    try {
+      const success = await deleteTeacher(selectedTeacher.id);
+      
+      if (success) {
+        setDeleteDialogOpen(false);
+        setSelectedTeacher(null);
+        // Success message is already shown by the hook
+      } else {
+        toast.error('Failed to delete teacher');
+      }
+    } catch (error) {
+      console.error('Error deleting teacher:', error);
+      toast.error('Failed to delete teacher');
+    }
   };
 
   // Calculate document counts per teacher
@@ -402,12 +477,12 @@ export default function AdminTeachers() {
                           <Calendar className="h-3 w-3" />
                           <span>Joined {formatDate(teacher.createdAt)}</span>
                         </div>
-                        {teacher.last_login && (
+                        {/* {teacher.lastLogin && (
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span>Last login {formatDateTime(teacher.last_login)}</span>
+                            <span>Last login {formatDateTime(teacher.lastLogin)}</span>
                           </div>
-                        )}
+                        )} */}
                       </div>
                     </div>
                   </div>
@@ -470,7 +545,10 @@ export default function AdminTeachers() {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={() => handleDeleteTeacher(teacher)}
+                        >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete Account
                         </DropdownMenuItem>
@@ -496,29 +574,32 @@ export default function AdminTeachers() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="firstName"
                     value={newTeacher.firstName}
                     onChange={(e) => setNewTeacher(prev => ({ ...prev, firstName: e.target.value }))}
+                    placeholder="Enter first name"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="lastName"
                     value={newTeacher.lastName}
                     onChange={(e) => setNewTeacher(prev => ({ ...prev, lastName: e.target.value }))}
+                    placeholder="Enter last name"
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
                 <Input
                   id="email"
                   type="email"
                   value={newTeacher.email}
                   onChange={(e) => setNewTeacher(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="Enter email address"
                 />
               </div>
               <div className="space-y-2">
@@ -527,15 +608,18 @@ export default function AdminTeachers() {
                   id="phoneNumber"
                   value={newTeacher.phoneNumber}
                   onChange={(e) => setNewTeacher(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                  placeholder="Enter phone number (optional)"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="temporaryPassword">Temporary Password</Label>
+                <Label htmlFor="temporaryPassword">Temporary Password <span className="text-red-500">*</span></Label>
                 <div className="flex gap-2">
                   <Input
                     id="temporaryPassword"
+                    type="password"
                     value={newTeacher.temporaryPassword}
                     onChange={(e) => setNewTeacher(prev => ({ ...prev, temporaryPassword: e.target.value }))}
+                    placeholder="Enter temporary password (min 6 characters)"
                   />
                   <Button variant="outline" onClick={generatePassword}>
                     Generate
@@ -591,12 +675,12 @@ export default function AdminTeachers() {
                     <Label className="text-sm font-medium">Join Date</Label>
                     <p className="text-sm text-muted-foreground">{formatDate(selectedTeacher.createdAt)}</p>
                   </div>
-                  {selectedTeacher.lastLogin && (
+                  {/* {selectedTeacher.lastLogin && (
                     <div>
                       <Label className="text-sm font-medium">Last Login</Label>
                       <p className="text-sm text-muted-foreground">{formatDateTime(selectedTeacher.lastLogin)}</p>
                     </div>
-                  )}
+                  )} */}
                 </div>
 
                 {selectedTeacher.bio && (
@@ -628,7 +712,7 @@ export default function AdminTeachers() {
             <DialogHeader>
               <DialogTitle>Approve Teacher Account</DialogTitle>
               <DialogDescription>
-                Are you sure you want to approve the account for {selectedTeacher?.first_name} {selectedTeacher?.last_name}? 
+                Are you sure you want to approve the account for {selectedTeacher?.user.firstName} {selectedTeacher?.user.lastName}? 
                 They will gain full access to the system.
               </DialogDescription>
             </DialogHeader>
@@ -650,7 +734,7 @@ export default function AdminTeachers() {
             <DialogHeader>
               <DialogTitle>Reject Teacher Account</DialogTitle>
               <DialogDescription>
-                Please provide a reason for rejecting {selectedTeacher?.first_name} {selectedTeacher?.last_name}'s account.
+                Please provide a reason for rejecting {selectedTeacher?.user.firstName} {selectedTeacher?.user.lastName}'s account.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -690,8 +774,8 @@ export default function AdminTeachers() {
               </DialogTitle>
               <DialogDescription>
                 {selectedTeacher?.status === 'suspended' 
-                  ? `Are you sure you want to reactivate ${selectedTeacher?.first_name} ${selectedTeacher?.last_name}'s account?`
-                  : `Are you sure you want to suspend ${selectedTeacher?.first_name} ${selectedTeacher?.last_name}'s account?`
+                  ? `Are you sure you want to reactivate ${selectedTeacher?.user.firstName} ${selectedTeacher?.user.lastName}'s account?`
+                  : `Are you sure you want to suspend ${selectedTeacher?.user.firstName} ${selectedTeacher?.user.lastName}'s account?`
                 }
               </DialogDescription>
             </DialogHeader>
@@ -726,6 +810,45 @@ export default function AdminTeachers() {
                     Suspend Account
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Teacher Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Teacher Account</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete {selectedTeacher?.user.firstName} {selectedTeacher?.user.lastName}'s account? 
+                This action cannot be undone and will remove all their data including uploaded documents.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 my-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-destructive">Warning</h4>
+                  <p className="text-sm text-destructive/80 mt-1">
+                    This will permanently delete:
+                  </p>
+                  <ul className="text-sm text-destructive/80 mt-2 space-y-1">
+                    <li>• Teacher account and profile</li>
+                    <li>• All uploaded documents</li>
+                    <li>• Sharing history and permissions</li>
+                    <li>• Activity logs and statistics</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Permanently
               </Button>
             </DialogFooter>
           </DialogContent>
