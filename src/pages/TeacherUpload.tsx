@@ -42,7 +42,7 @@ interface UploadFile {
 }
 
 export default function TeacherUpload() {
-  const { categories, loading: categoriesLoading } = useCategories();
+  const { categories, isLoading: categoriesLoading } = useCategories();
   const { uploadDocument } = useDocuments();
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
