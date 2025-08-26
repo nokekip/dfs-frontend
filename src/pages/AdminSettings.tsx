@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,14 +13,23 @@ import {
   Settings, 
   Shield, 
   Save,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
+import { useSettings } from '../hooks/useSettings';
+import { toast } from 'sonner';
 
 export default function AdminSettings() {
-  const [saveSuccess, setSaveSuccess] = useState('');
+  const { 
+    systemSettings, 
+    securitySettings, 
+    isLoading, 
+    updateSystemSettings, 
+    updateSecuritySettings 
+  } = useSettings('admin');
   
-  // System Settings
-  const [systemSettings, setSystemSettings] = useState({
+  // Initialize local state with default values
+  const [localSystemSettings, setLocalSystemSettings] = useState({
     siteName: 'Digital Filing System for Teachers',
     siteDescription: 'Kenya Teacher Document Management System',
     maxFileSize: '10', // MB
@@ -32,24 +41,80 @@ export default function AdminSettings() {
   });
 
   // Security Settings
-  const [securitySettings, setSecuritySettings] = useState({
+  const [localSecuritySettings, setLocalSecuritySettings] = useState({
     twoFactorRequired: true,
     enableAuditLogs: true
   });
 
-  const handleSystemSave = () => {
-    // In real app, this would save via Django REST API
-    console.log('System settings saved:', systemSettings);
-    setSaveSuccess('System settings saved successfully!');
-    setTimeout(() => setSaveSuccess(''), 3000);
+  // Update local state when settings are loaded
+  useEffect(() => {
+    if (systemSettings) {
+      setLocalSystemSettings({
+        siteName: systemSettings.siteName || 'Digital Filing System for Teachers',
+        siteDescription: systemSettings.siteDescription || 'Kenya Teacher Document Management System',
+        maxFileSize: systemSettings.maxFileSize?.toString() || '10',
+        allowedFileTypes: systemSettings.allowedFileTypes || 'pdf,docx,xlsx,pptx,jpg,png',
+        sessionTimeout: systemSettings.sessionTimeout?.toString() || '30',
+        maintenanceMode: systemSettings.maintenanceMode || false,
+        registrationEnabled: systemSettings.registrationEnabled || true,
+        requireAdminApproval: systemSettings.requireAdminApproval || true
+      });
+    }
+  }, [systemSettings]);
+
+  useEffect(() => {
+    if (securitySettings) {
+      setLocalSecuritySettings({
+        twoFactorRequired: securitySettings.twoFactorRequired || true,
+        enableAuditLogs: securitySettings.enableAuditLogs || true
+      });
+    }
+  }, [securitySettings]);
+
+  const handleSystemSave = async () => {
+    try {
+      const updatedSettings = {
+        siteName: localSystemSettings.siteName,
+        siteDescription: localSystemSettings.siteDescription,
+        maxFileSize: parseInt(localSystemSettings.maxFileSize),
+        allowedFileTypes: localSystemSettings.allowedFileTypes,
+        sessionTimeout: parseInt(localSystemSettings.sessionTimeout),
+        maintenanceMode: localSystemSettings.maintenanceMode,
+        registrationEnabled: localSystemSettings.registrationEnabled,
+        requireAdminApproval: localSystemSettings.requireAdminApproval
+      };
+
+      await updateSystemSettings(updatedSettings);
+    } catch (error) {
+      toast.error('Failed to save system settings');
+    }
   };
 
-  const handleSecuritySave = () => {
-    // In real app, this would save via Django REST API
-    console.log('Security settings saved:', securitySettings);
-    setSaveSuccess('Security settings saved successfully!');
-    setTimeout(() => setSaveSuccess(''), 3000);
+  const handleSecuritySave = async () => {
+    try {
+      const updatedSettings = {
+        twoFactorRequired: localSecuritySettings.twoFactorRequired,
+        enableAuditLogs: localSecuritySettings.enableAuditLogs
+      };
+
+      await updateSecuritySettings(updatedSettings);
+    } catch (error) {
+      toast.error('Failed to save security settings');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading settings...</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -62,15 +127,7 @@ export default function AdminSettings() {
           </p>
         </div>
 
-        {/* Success Message */}
-        {saveSuccess && (
-          <Alert className="bg-success/10 border-success/20">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <AlertDescription className="text-success-foreground">
-              {saveSuccess}
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* Success messages are now handled by toast notifications */}
 
         {/* Settings Tabs */}
         <Tabs defaultValue="system" className="space-y-4">
@@ -97,8 +154,8 @@ export default function AdminSettings() {
                     <Label htmlFor="siteName">Site Name</Label>
                     <Input
                       id="siteName"
-                      value={systemSettings.siteName}
-                      onChange={(e) => setSystemSettings(prev => ({ ...prev, siteName: e.target.value }))}
+                      value={localSystemSettings.siteName}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, siteName: e.target.value }))}
                     />
                   </div>
                   <div className="space-y-2">
@@ -106,8 +163,8 @@ export default function AdminSettings() {
                     <Input
                       id="maxFileSize"
                       type="number"
-                      value={systemSettings.maxFileSize}
-                      onChange={(e) => setSystemSettings(prev => ({ ...prev, maxFileSize: e.target.value }))}
+                      value={localSystemSettings.maxFileSize}
+                      onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, maxFileSize: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -116,8 +173,8 @@ export default function AdminSettings() {
                   <Label htmlFor="siteDescription">Site Description</Label>
                   <Textarea
                     id="siteDescription"
-                    value={systemSettings.siteDescription}
-                    onChange={(e) => setSystemSettings(prev => ({ ...prev, siteDescription: e.target.value }))}
+                    value={localSystemSettings.siteDescription}
+                    onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, siteDescription: e.target.value }))}
                     rows={2}
                   />
                 </div>
@@ -126,8 +183,8 @@ export default function AdminSettings() {
                   <Label htmlFor="allowedFileTypes">Allowed File Types</Label>
                   <Input
                     id="allowedFileTypes"
-                    value={systemSettings.allowedFileTypes}
-                    onChange={(e) => setSystemSettings(prev => ({ ...prev, allowedFileTypes: e.target.value }))}
+                    value={localSystemSettings.allowedFileTypes}
+                    onChange={(e) => setLocalSystemSettings(prev => ({ ...prev, allowedFileTypes: e.target.value }))}
                     placeholder="pdf,docx,xlsx,pptx,jpg,png"
                   />
                   <p className="text-xs text-muted-foreground">
@@ -138,8 +195,8 @@ export default function AdminSettings() {
                 <div className="space-y-2">
                   <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
                   <Select
-                    value={systemSettings.sessionTimeout}
-                    onValueChange={(value) => setSystemSettings(prev => ({ ...prev, sessionTimeout: value }))}
+                    value={localSystemSettings.sessionTimeout}
+                    onValueChange={(value) => setLocalSystemSettings(prev => ({ ...prev, sessionTimeout: value }))}
                   >
                     <SelectTrigger className="max-w-xs">
                       <SelectValue />
@@ -163,8 +220,8 @@ export default function AdminSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={systemSettings.maintenanceMode}
-                      onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, maintenanceMode: checked }))}
+                      checked={localSystemSettings.maintenanceMode}
+                      onCheckedChange={(checked) => setLocalSystemSettings(prev => ({ ...prev, maintenanceMode: checked }))}
                     />
                   </div>
 
@@ -176,8 +233,8 @@ export default function AdminSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={systemSettings.registrationEnabled}
-                      onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, registrationEnabled: checked }))}
+                      checked={localSystemSettings.registrationEnabled}
+                      onCheckedChange={(checked) => setLocalSystemSettings(prev => ({ ...prev, registrationEnabled: checked }))}
                     />
                   </div>
 
@@ -189,8 +246,8 @@ export default function AdminSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={systemSettings.requireAdminApproval}
-                      onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, requireAdminApproval: checked }))}
+                      checked={localSystemSettings.requireAdminApproval}
+                      onCheckedChange={(checked) => setLocalSystemSettings(prev => ({ ...prev, requireAdminApproval: checked }))}
                     />
                   </div>
                 </div>
@@ -225,8 +282,8 @@ export default function AdminSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={securitySettings.twoFactorRequired}
-                      onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, twoFactorRequired: checked }))}
+                      checked={localSecuritySettings.twoFactorRequired}
+                      onCheckedChange={(checked) => setLocalSecuritySettings(prev => ({ ...prev, twoFactorRequired: checked }))}
                     />
                   </div>
 
@@ -238,8 +295,8 @@ export default function AdminSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={securitySettings.enableAuditLogs}
-                      onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, enableAuditLogs: checked }))}
+                      checked={localSecuritySettings.enableAuditLogs}
+                      onCheckedChange={(checked) => setLocalSecuritySettings(prev => ({ ...prev, enableAuditLogs: checked }))}
                     />
                   </div>
                 </div>
