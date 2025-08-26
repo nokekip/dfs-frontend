@@ -191,16 +191,14 @@ export default function TeacherUpload() {
       const documentData = {
         title: fileData.title,
         description: fileData.description,
-        category_id: fileData.category,
-        class_level: fileData.class || null,
-        subject: fileData.subject || null,
-        file_type: fileData.file.type,
-        file_size: fileData.file.size,
-        file_name: fileData.file.name
+        categoryId: fileData.category,
+        classLevel: fileData.class || undefined,
+        subject: fileData.subject || undefined,
+        file: fileData.file
       };
 
       // Upload through our API
-      await uploadDocument(documentData, fileData.file);
+      await uploadDocument(documentData);
 
       // Complete the progress
       clearInterval(progressInterval);
@@ -256,7 +254,7 @@ export default function TeacherUpload() {
   const canUploadFile = (file: UploadFile) => {
     const category = getSelectedCategory(file.category);
     return file.title && file.category && file.status !== 'error' && 
-           (!category?.requires_class_subject || (file.class && file.subject));
+           (!category?.requiresClassSubject || (file.class && file.subject));
   };
 
   const readyToUploadCount = uploadFiles.filter(canUploadFile).length;
@@ -438,7 +436,7 @@ export default function TeacherUpload() {
                             </Select>
                           </div>
 
-                          {category?.requires_class_subject && (
+                          {category?.requiresClassSubject && (
                             <>
                               <div className="space-y-2">
                                 <Label>Class *</Label>
