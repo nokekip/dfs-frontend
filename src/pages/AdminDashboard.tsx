@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTeachers } from '../hooks/useTeachers';
 import { useCategories } from '../hooks/useCategories';
 import { useDashboard } from '../hooks/useDashboard';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { Loading } from '../components/Loading';
 import { ErrorMessage } from '../components/ErrorBoundary';
@@ -113,8 +114,10 @@ export default function AdminDashboard() {
   };
 
   const handleExportData = () => {
-    console.log('Exporting data...');
     // In real app, this would trigger data export
+    toast.success('Export Started', {
+      description: 'Data export has been initiated'
+    });
   };
 
   const handleSecuritySettings = () => {
@@ -138,7 +141,7 @@ export default function AdminDashboard() {
         setApproveDialogOpen(false);
         setSelectedTeacher(null);
       } catch (error) {
-        console.error('Failed to approve teacher:', error);
+        toast.error('Failed to approve teacher');
       }
     }
   };
@@ -186,14 +189,18 @@ export default function AdminDashboard() {
     if (!selectedCategory) return;
     
     if (selectedCategory.documentsCount > 0) {
-      console.log('Cannot delete category with existing documents');
+      toast.error('Cannot delete category', {
+        description: 'This category still contains documents'
+      });
       setDeleteCategoryDialogOpen(false);
       setSelectedCategory(null);
       return;
     }
     
     // In real app, this would call deleteCategory API
-    console.log(`Deleted category: ${selectedCategory.name}`);
+    toast.success('Category Deleted', {
+      description: `Category "${selectedCategory.name}" has been deleted`
+    });
     setDeleteCategoryDialogOpen(false);
     setSelectedCategory(null);
     fetchCategories(); // Refresh list

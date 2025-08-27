@@ -173,7 +173,6 @@ export default function AdminTeachers() {
         toast.error('Failed to approve teacher');
       }
     } catch (error) {
-      console.error('Error approving teacher:', error);
       toast.error('Failed to approve teacher');
     }
   };
@@ -206,7 +205,6 @@ export default function AdminTeachers() {
         toast.error('Failed to reject teacher');
       }
     } catch (error) {
-      console.error('Error rejecting teacher:', error);
       toast.error('Failed to reject teacher');
     }
   };
@@ -292,7 +290,6 @@ export default function AdminTeachers() {
         toast.error('Failed to add teacher. Please try again.');
       }
     } catch (error) {
-      console.error('Error adding teacher:', error);
       toast.error('Failed to add teacher. Please try again.');
     }
   };
@@ -324,7 +321,6 @@ export default function AdminTeachers() {
         toast.error('Failed to delete teacher');
       }
     } catch (error) {
-      console.error('Error deleting teacher:', error);
       toast.error('Failed to delete teacher');
     }
   };

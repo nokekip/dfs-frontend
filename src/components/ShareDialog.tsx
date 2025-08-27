@@ -64,7 +64,6 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
         description: 'Share link has been copied to clipboard'
       });
     } catch (err) {
-      console.error('Failed to copy:', err);
       // Fallback for older browsers
       const textArea = window.document.createElement('textarea');
       textArea.value = text;

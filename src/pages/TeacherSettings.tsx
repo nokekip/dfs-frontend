@@ -147,7 +147,6 @@ export default function TeacherSettings() {
 
     try {
       // In real app, this would update password via Django REST API
-      console.log('Password changed successfully');
       setSecuritySettings(prev => ({
         ...prev,
         currentPassword: '',
@@ -167,7 +166,6 @@ export default function TeacherSettings() {
 
   const handleNotificationsSave = () => {
     // In real app, this would save via Django REST API
-    console.log('Notification settings saved:', notificationSettings);
     toast.success('Settings Saved', {
       description: 'Your notification preferences have been updated'
     });

@@ -158,7 +158,9 @@ export default function TeacherDocuments() {
 
   const handleDownload = (doc: Document) => {
     // In real app, this would trigger actual download
-    console.log('Downloading:', doc.fileName);
+    toast.success('Download Started', {
+      description: `Downloading ${doc.fileName}`
+    });
 
     // Simulate download
     const link = window.document.createElement('a');
@@ -173,7 +175,9 @@ export default function TeacherDocuments() {
 
   const handlePreview = (document: Document) => {
     // In real app, this would open document in preview modal or new tab
-    console.log('Previewing:', document.fileName);
+    toast.info('Opening Preview', {
+      description: `Opening ${document.fileName} in preview`
+    });
     window.open(`/preview/${document.id}`, '_blank');
   };
 
@@ -217,7 +221,10 @@ export default function TeacherDocuments() {
 
   const handleShareSubmit = async (shareData: any) => {
     if (selectedDocument) {
-      console.log('Sharing document with data:', shareData);
+      // In real app, this would call the share API
+      toast.success('Document Shared', {
+        description: `${selectedDocument.fileName} has been shared successfully`
+      });
 
       try {
         // Call the hook's shareDocument function to update the document status

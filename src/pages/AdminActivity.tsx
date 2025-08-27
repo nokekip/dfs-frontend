@@ -431,11 +431,14 @@ export default function AdminActivity() {
                   <div className="flex-1 min-w-0 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {activity.userName.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar 
+                          user={{ 
+                            firstName: activity.userName.split(' ')[0], 
+                            lastName: activity.userName.split(' ')[1] || '',
+                            id: '', email: '', role: 'teacher'
+                          }} 
+                          size="sm" 
+                        />
                         <span className="font-medium">{activity.userName}</span>
                         <Badge variant="outline" className="text-xs">
                           {activity.userRole}

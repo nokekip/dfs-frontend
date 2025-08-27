@@ -146,13 +146,17 @@ export default function TeacherDashboard() {
 
   const handleView = (file: any) => {
     // In real app, this would open document in preview modal or new tab
-    console.log('Viewing:', file.fileName);
+    toast.info('Opening Preview', {
+      description: `Opening ${file.fileName} in preview`
+    });
     window.open(`/preview/${file.id}`, '_blank');
   };
 
   const handleDownload = (file: any) => {
     // In real app, this would trigger actual download
-    console.log('Downloading:', file.fileName);
+    toast.success('Download Started', {
+      description: `Downloading ${file.fileName}`
+    });
     // Simulate download
     const link = document.createElement('a');
     link.href = '#';

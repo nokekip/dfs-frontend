@@ -94,20 +94,25 @@ export default function TeacherShared() {
   };
 
   const handleDownload = (document: any) => {
-    console.log('Downloading:', document.file_name || document.title);
+    toast.success('Download Started', {
+      description: `Downloading ${document.file_name || document.title}`
+    });
     // In real app, this would trigger actual download
   };
 
   const handlePreview = (document: any) => {
-    console.log('Previewing:', document.file_name || document.title);
+    toast.info('Opening Preview', {
+      description: `Opening ${document.file_name || document.title} in preview`
+    });
     // In real app, this would open document in preview modal or new tab
     window.open(`/preview/${document.id}`, '_blank');
   };
 
   const handleRequestAccess = (document: any) => {
-    console.log('Requesting access to:', document.title);
     // In real app, this would send a request to the document owner
-    toast.success('Access request sent');
+    toast.success('Access Request Sent', {
+      description: `Access request sent for ${document.title}`
+    });
   };
 
   const handleShareMore = (document: any) => {
