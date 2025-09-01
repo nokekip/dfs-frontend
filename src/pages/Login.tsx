@@ -19,6 +19,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [showOTP, setShowOTP] = useState(false);
   const [otpMessage, setOtpMessage] = useState('');
+  const [userId, setUserId] = useState(''); // Store user ID for OTP verification
   
   const { login, verifyOTP, isLoading } = useAuth();
   const { getSiteName } = useGlobalSettings();
@@ -32,23 +33,24 @@ export default function Login() {
       if (!showOTP) {
         // First step: email and password
         const response = await login(formData.email, formData.password);
-        if (response.requiresOTP) {
+        
+        if (response.requiresOtp && response.user) {
           setShowOTP(true);
-          setOtpMessage(response.message || 'OTP sent to your registered phone number');
-          toast.success('OTP Sent', {
-            description: 'Please check your phone for the verification code'
-          });
+          setUserId(response.user.id);
+          setOtpMessage(response.message || 'Verification code sent to your email');
+          // Don't show success toast here - only show after OTP verification
+        } else {
+          // Direct login successful (shouldn't happen with current backend)
+          navigate('/dashboard');
         }
       } else {
         // Second step: OTP verification
-        await verifyOTP(formData.email, formData.otp);
-
-        toast.success('Login Successful', {
-          description: `Welcome to ${getSiteName()}`
-        });
-
-        // Redirect based on user role (this will be handled by the App routing)
-        navigate('/dashboard');
+        const success = await verifyOTP(userId, formData.otp);
+        
+        if (success) {
+          // Success toast is handled in the verifyOTP hook
+          navigate('/dashboard');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -81,7 +83,7 @@ export default function Login() {
             </CardTitle>
             <CardDescription className="text-center">
               {showOTP 
-                ? 'Enter the verification code sent to your phone'
+                ? 'Enter the verification code sent to your email'
                 : 'Sign in to access your document management system'
               }
             </CardDescription>
@@ -92,7 +94,7 @@ export default function Login() {
               {!showOTP ? (
                 <>
                   {/* Demo Credentials */}
-                  <div className="bg-info/10 border border-info/20 rounded-lg p-3 mb-4">
+                  {/* <div className="bg-info/10 border border-info/20 rounded-lg p-3 mb-4">
                     <div className="flex items-start gap-2">
                       <Shield className="w-4 h-4 text-info mt-0.5" />
                       <div className="text-xs text-info-foreground/80">
@@ -102,7 +104,7 @@ export default function Login() {
                         <div className="mt-1 text-xs opacity-75">OTP: 123456</div>
                       </div>
                     </div>
-                  </div>
+                  </div> */}
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
@@ -200,6 +202,7 @@ export default function Login() {
                   className="w-full"
                   onClick={() => {
                     setShowOTP(false);
+                    setUserId('');
                     setFormData(prev => ({ ...prev, otp: '' }));
                     setError('');
                   }}

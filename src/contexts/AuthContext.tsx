@@ -6,8 +6,9 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ requiresOTP: boolean; message?: string }>;
-  verifyOTP: (email: string, otp: string) => Promise<void>;
+  pendingOtpUser: User | null;
+  login: (email: string, password: string) => Promise<{ requiresOtp: boolean; message?: string; user?: User }>;
+  verifyOTP: (userId: string, otp: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => Promise<void>;
@@ -40,12 +41,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Wrapper functions to match the expected interface
   const login = async (email: string, password: string) => {
-    const success = await authHook.login({ email, password });
-    return { requiresOTP: success, message: success ? 'Login successful' : 'Login failed' };
+    return await authHook.login({ email, password });
   };
 
-  const verifyOTP = async (email: string, otp: string) => {
-    await authHook.verifyOTP({ email, otp });
+  const verifyOTP = async (userId: string, otp: string) => {
+    return await authHook.verifyOTP({ user_id: userId, otp });
   };
 
   const register = async (userData: RegisterData) => {
@@ -72,6 +72,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user: authHook.user,
     isLoading: authHook.isLoading,
     isAuthenticated: authHook.isAuthenticated,
+    pendingOtpUser: authHook.pendingOtpUser,
     login,
     verifyOTP,
     register,

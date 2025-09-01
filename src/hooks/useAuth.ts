@@ -19,10 +19,11 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  pendingOtpUser: User | null; // Store user info during OTP flow
 }
 
 interface AuthActions {
-  login: (credentials: LoginRequest) => Promise<boolean>;
+  login: (credentials: LoginRequest) => Promise<{ requiresOtp: boolean; message?: string; user?: User }>;
   register: (data: RegisterRequest) => Promise<boolean>;
   verifyOTP: (data: OTPVerificationRequest) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -38,6 +39,7 @@ export const useAuth = (): AuthState & AuthActions => {
     isAuthenticated: false,
     isLoading: true,
     error: null,
+    pendingOtpUser: null,
   });
 
   // Initialize auth state on mount
@@ -53,6 +55,7 @@ export const useAuth = (): AuthState & AuthActions => {
             isAuthenticated: true,
             isLoading: false,
             error: null,
+            pendingOtpUser: null,
           });
         } else {
           setState(prev => ({
@@ -73,29 +76,48 @@ export const useAuth = (): AuthState & AuthActions => {
     initializeAuth();
   }, []);
 
-  const login = useCallback(async (credentials: LoginRequest): Promise<boolean> => {
+  const login = useCallback(async (credentials: LoginRequest): Promise<{ requiresOtp: boolean; message?: string; user?: User }> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
       const response = await apiClient.login(credentials);
       
       if (response.success && response.data) {
-        setState({
-          user: response.data.user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        });
+        // Check if OTP is required
+        if (response.data.requiresOtp) {
+          setState(prev => ({
+            ...prev,
+            isLoading: false,
+            pendingOtpUser: response.data.user,
+          }));
 
-        toast.success('Welcome back!', {
-          description: `Logged in as ${response.data.user.firstName} ${response.data.user.lastName}`,
-        });
+          return {
+            requiresOtp: true,
+            message: response.message,
+            user: response.data.user,
+          };
+        }
 
-        return true;
+        // Direct login (if tokens are provided immediately)
+        if (response.data.tokens) {
+          setState({
+            user: response.data.user,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+            pendingOtpUser: null,
+          });
+
+          toast.success('Welcome back!', {
+            description: `Logged in as ${response.data.user.firstName} ${response.data.user.lastName}`,
+          });
+
+          return { requiresOtp: false, message: response.message };
+        }
       }
 
       setState(prev => ({ ...prev, isLoading: false }));
-      return false;
+      return { requiresOtp: false };
     } catch (error) {
       const errorMessage = error instanceof ApiError 
         ? error.message 
@@ -105,13 +127,14 @@ export const useAuth = (): AuthState & AuthActions => {
         ...prev,
         isLoading: false,
         error: errorMessage,
+        pendingOtpUser: null,
       }));
 
       toast.error('Login Failed', {
         description: errorMessage,
       });
 
-      return false;
+      return { requiresOtp: false };
     }
   }, []);
 
@@ -164,10 +187,11 @@ export const useAuth = (): AuthState & AuthActions => {
           isAuthenticated: true,
           isLoading: false,
           error: null,
+          pendingOtpUser: null,
         });
 
-        toast.success('Email Verified!', {
-          description: 'Your account has been verified successfully.',
+        toast.success('Welcome back!', {
+          description: `Welcome ${response.data.user.firstName} ${response.data.user.lastName}`,
         });
 
         return true;
@@ -220,6 +244,7 @@ export const useAuth = (): AuthState & AuthActions => {
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        pendingOtpUser: null,
       });
 
     }

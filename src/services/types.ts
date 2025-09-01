@@ -5,7 +5,7 @@
 // Base types
 export type UserRole = 'admin' | 'teacher';
 export type TeacherStatus = 'active' | 'pending' | 'suspended' | 'rejected';
-export type DocumentStatus = 'active' | 'flagged' | 'archived';
+export type DocumentStatus = 'active' | 'flagged' | 'archived' | 'published';
 export type ActivityAction = 'upload' | 'delete' | 'share' | 'login' | 'register' | 'approve' | 'reject' | 'create' | 'update';
 
 // User & Authentication types
@@ -19,6 +19,7 @@ export interface User {
   dateJoined: string;
   lastLogin?: string;
   profilePicture?: string;
+  username?: string; // Added to match Django backend
 }
 
 export interface AuthTokens {
@@ -33,7 +34,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   user: User;
-  tokens: AuthTokens;
+  tokens: AuthTokens | null; // null during OTP flow
+  requiresOtp?: boolean; // Added for OTP flow
 }
 
 export interface RegisterRequest {
@@ -45,7 +47,7 @@ export interface RegisterRequest {
 }
 
 export interface OTPVerificationRequest {
-  email: string;
+  user_id: string; // Changed to match Django backend
   otp: string;
 }
 

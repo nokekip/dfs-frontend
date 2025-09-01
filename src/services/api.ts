@@ -1,11 +1,11 @@
 /**
  * Main API Client
- * Simulates Django REST Framework API responses
+ * Integrates with Django REST Framework backend API
  */
 
+import { config } from '../lib/config';
 import { 
   ApiResponse, 
-  ApiError, 
   User, 
   LoginRequest, 
   LoginResponse, 
@@ -89,51 +89,98 @@ export class ApiClient {
 
   // Authentication Methods
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    await delay();
+    try {
+      const response = await fetch(`${config.api.baseUrl}/accounts/auth/login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: credentials.email,
+          password: credentials.password,
+        }),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
 
-    const users = mockDataStore.getUsers();
-    const user = users.find(u => u.email === credentials.email);
+      const data = await response.json();
 
-    if (!user || !user.isActive) {
-      simulateError('Invalid credentials', 401);
+      if (!response.ok) {
+        throw new ApiError(data.error || 'Login failed', response.status);
+      }
+
+      // Check if OTP is required (Django sends user info + requires_otp flag)
+      if (data.requires_otp) {
+        // For OTP flow, we return the partial user data
+        // Frontend will handle OTP verification separately
+        return {
+          success: true,
+          data: {
+            user: {
+              id: data.user_id,
+              email: data.email,
+              firstName: data.first_name,
+              lastName: data.last_name,
+              role: data.role,
+              username: data.username,
+              isActive: true,
+              dateJoined: new Date().toISOString(), // We don't have this from login response
+            },
+            tokens: null, // No tokens until OTP is verified
+            requiresOtp: true,
+          },
+          message: data.message || 'Verification code sent to your email',
+        };
+      }
+
+      // If no OTP required (shouldn't happen with current backend, but handling it)
+      if (data.access && data.refresh) {
+        const user: User = {
+          id: data.user.id,
+          email: data.user.email,
+          firstName: data.user.first_name,
+          lastName: data.user.last_name,
+          role: data.user.role,
+          username: data.user.username,
+          isActive: true,
+          dateJoined: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+        };
+
+        const tokens: AuthTokens = {
+          access: data.access,
+          refresh: data.refresh,
+        };
+
+        // Save authentication state
+        mockDataStore.saveCurrentUser(user);
+        mockDataStore.saveAuthToken(tokens.access);
+
+        return {
+          success: true,
+          data: { user, tokens },
+          message: data.message || 'Login successful',
+        };
+      }
+
+      // Fallback error
+      throw new ApiError('Unexpected response format', 500);
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred during login', 500);
     }
-
-    // Mock password validation (in real app, this would be hashed)
-    const validPasswords: Record<string, string> = {
-      'admin@school.co.ke': 'admin123',
-      'teacher@school.co.ke': 'teacher123',
-      'john.kiprotich@school.co.ke': 'teacher123',
-      'mary.ochieng@school.co.ke': 'teacher123',
-    };
-
-    if (validPasswords[credentials.email] !== credentials.password) {
-      simulateError('Invalid credentials', 401);
-    }
-
-    // Update last login
-    user.lastLogin = new Date().toISOString();
-    const updatedUsers = users.map(u => u.id === user.id ? user : u);
-    mockDataStore.saveUsers(updatedUsers);
-
-    // Generate tokens
-    const tokens = generateMockToken(user);
-    
-    // Save authentication state
-    mockDataStore.saveCurrentUser(user);
-    mockDataStore.saveAuthToken(tokens.access);
-
-    // Log activity
-    mockDataStore.addActivityLog({
-      user,
-      action: 'login',
-      description: 'logged into the system',
-    });
-
-    return {
-      success: true,
-      data: { user, tokens },
-      message: 'Login successful',
-    };
   }
 
   async register(data: RegisterRequest): Promise<ApiResponse<{ message: string }>> {
@@ -194,37 +241,69 @@ export class ApiClient {
   }
 
   async verifyOTP(data: OTPVerificationRequest): Promise<ApiResponse<LoginResponse>> {
-    await delay();
+    try {
+      const response = await fetch(`${config.api.baseUrl}/accounts/auth/verify-otp/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: data.user_id,
+          otp: data.otp,
+        }),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
 
-    // Mock OTP verification (always accept "123456")
-    if (data.otp !== '123456') {
-      simulateError('Invalid OTP', 400);
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new ApiError(responseData.error || 'OTP verification failed', response.status);
+      }
+
+      // Success - create user and tokens from response
+      const user: User = {
+        id: responseData.user.id,
+        email: responseData.user.email,
+        firstName: responseData.user.first_name,
+        lastName: responseData.user.last_name,
+        role: responseData.user.role,
+        username: responseData.user.username,
+        isActive: true,
+        dateJoined: new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
+      };
+
+      const tokens: AuthTokens = {
+        access: responseData.access,
+        refresh: responseData.refresh,
+      };
+
+      // Save authentication state
+      mockDataStore.saveCurrentUser(user);
+      mockDataStore.saveAuthToken(tokens.access);
+
+      return {
+        success: true,
+        data: { user, tokens },
+        message: responseData.message || 'OTP verified successfully',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred during OTP verification', 500);
     }
-
-    const users = mockDataStore.getUsers();
-    const user = users.find(u => u.email === data.email);
-
-    if (!user) {
-      simulateError('User not found', 404);
-    }
-
-    // Activate user
-    user.isActive = true;
-    const updatedUsers = users.map(u => u.id === user.id ? user : u);
-    mockDataStore.saveUsers(updatedUsers);
-
-    // Generate tokens
-    const tokens = generateMockToken(user);
-    
-    // Save authentication state
-    mockDataStore.saveCurrentUser(user);
-    mockDataStore.saveAuthToken(tokens.access);
-
-    return {
-      success: true,
-      data: { user, tokens },
-      message: 'Email verified successfully',
-    };
   }
 
   async logout(): Promise<ApiResponse<{ message: string }>> {
@@ -608,6 +687,7 @@ export class ApiClient {
       classLevel: data.classLevel,
       subject: data.subject,
       isShared: false,
+      sharedWith: [], // Initialize as empty array
       downloadCount: 0,
       status: 'published',
       tags: data.tags || [],
