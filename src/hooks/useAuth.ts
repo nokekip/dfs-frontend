@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { config } from '../lib/config';
 import { 
   User, 
   LoginRequest, 
@@ -28,7 +29,7 @@ interface AuthActions {
   verifyOTP: (data: OTPVerificationRequest) => Promise<boolean>;
   logout: () => Promise<void>;
   forgotPassword: (data: PasswordResetRequest) => Promise<boolean>;
-  updateProfile: (data: Partial<User>) => Promise<boolean>;
+  updateProfile: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<void>;
   refreshUser: () => void;
   clearError: () => void;
 }
@@ -46,10 +47,11 @@ export const useAuth = (): AuthState & AuthActions => {
   useEffect(() => {
     const initializeAuth = () => {
       try {
-        const token = mockDataStore.getAuthToken();
-        const user = mockDataStore.getCurrentUser();
+        const token = localStorage.getItem(config.auth.tokenKey);
+        const userString = localStorage.getItem(config.auth.userKey);
         
-        if (token && user) {
+        if (token && userString) {
+          const user = JSON.parse(userString) as User;
           setState({
             user,
             isAuthenticated: true,
@@ -229,6 +231,7 @@ export const useAuth = (): AuthState & AuthActions => {
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        pendingOtpUser: null,
       });
 
       toast.success('Logged Out', {
@@ -287,7 +290,7 @@ export const useAuth = (): AuthState & AuthActions => {
     }
   }, []);
 
-  const updateProfile = useCallback(async (data: Partial<User>): Promise<boolean> => {
+  const updateProfile = useCallback(async (data: Partial<User> & { profilePictureFile?: File }): Promise<boolean> => {
     if (!state.user) return false;
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));

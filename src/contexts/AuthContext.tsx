@@ -11,7 +11,7 @@ interface AuthContextType {
   verifyOTP: (userId: string, otp: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
-  updateUser: (userData: Partial<User>) => Promise<void>;
+    updateUser: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<void>;
 }
 
 interface RegisterData {
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     authHook.logout();
   };
 
-  const updateUser = async (userData: Partial<User>) => {
+  const updateUser = async (userData: Partial<User> & { profilePictureFile?: File }) => {
     await authHook.updateProfile(userData);
     // Force refresh the user data to ensure UI updates
     authHook.refreshUser();

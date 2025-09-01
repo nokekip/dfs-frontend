@@ -39,7 +39,10 @@ export default function Profile() {
     email: '',
     phoneNumber: '',
     bio: '',
-    profilePicture: undefined as string | undefined
+    profilePicture: undefined as string | undefined,
+    profilePictureFile: undefined as File | undefined, // Store the file for upload
+    profilePicturePreview: undefined as string | undefined, // Store preview URL
+    removeExistingPicture: false, // Flag to indicate removal of existing picture
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -51,11 +54,14 @@ export default function Profile() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
-        phoneNumber: '',
-        bio: (user.role === 'admin' 
+        phoneNumber: user.phoneNumber || '',
+        bio: user.bio || (user.role === 'admin' 
           ? 'System administrator responsible for managing the digital filing system and supporting teachers.'
           : 'Passionate educator dedicated to providing quality education.'),
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
+        profilePictureFile: undefined,
+        profilePicturePreview: undefined,
+        removeExistingPicture: false,
       });
     }
   }, [user]);
@@ -81,13 +87,34 @@ export default function Profile() {
     try {
       setIsSaving(true);
       
-      // Update user profile via the auth hook
-      await updateUser({
+      // Prepare update data
+      const updateData: any = {
         firstName: profileData.firstName,
         lastName: profileData.lastName,
         email: profileData.email,
-        profilePicture: profileData.profilePicture,
-      });
+        phoneNumber: profileData.phoneNumber,
+        bio: profileData.bio,
+      };
+
+      // Handle profile picture changes
+      if (profileData.profilePictureFile) {
+        // New file selected
+        updateData.profilePictureFile = profileData.profilePictureFile;
+      } else if (profileData.removeExistingPicture) {
+        // User wants to remove existing picture
+        updateData.removeProfilePicture = true;
+      }
+      
+      // Update user profile via the auth hook
+      await updateUser(updateData);
+      
+      // Clear the file and preview after successful upload
+      setProfileData(prev => ({
+        ...prev,
+        profilePictureFile: undefined,
+        profilePicturePreview: undefined,
+        removeExistingPicture: false,
+      }));
       
       toast.success('Profile Updated', {
         description: 'Your profile information has been saved successfully'
@@ -108,25 +135,41 @@ export default function Profile() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // Convert to base64 for better persistence
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const imageUrl = e.target?.result as string;
-          setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
-          toast.success('Photo Updated', {
-            description: 'Profile photo has been updated successfully'
+        // Validate file size (2MB limit)
+        if (file.size > 2 * 1024 * 1024) {
+          toast.error('File Too Large', {
+            description: 'Please choose an image smaller than 2MB'
           });
-        };
-        reader.readAsDataURL(file);
+          return;
+        }
+
+        // Create preview URL and store the file for later upload
+        const previewUrl = URL.createObjectURL(file);
+        setProfileData(prev => ({
+          ...prev,
+          profilePictureFile: file,
+          profilePicturePreview: previewUrl,
+        }));
+        
+        toast.success('Photo Selected', {
+          description: 'Photo selected. Click "Save Profile" to upload it.'
+        });
       }
     };
     input.click();
   };
 
   const handleRemovePhoto = () => {
-    setProfileData(prev => ({ ...prev, profilePicture: undefined }));
+    // Clear the preview and selected file, and mark for removal
+    setProfileData(prev => ({
+      ...prev,
+      profilePictureFile: undefined,
+      profilePicturePreview: undefined,
+      removeExistingPicture: true,
+    }));
+    
     toast.success('Photo Removed', {
-      description: 'Profile photo has been removed successfully'
+      description: 'Photo will be removed when you save your profile.'
     });
   };
 
@@ -199,12 +242,14 @@ export default function Profile() {
                 {/* Profile Picture */}
                 <div className="flex items-center gap-6">
                   <UserAvatar 
-                    key={profileData.profilePicture || 'no-picture'}
+                    key={profileData.profilePicturePreview || profileData.profilePicture || 'no-picture'}
                     user={{
                       ...user!,
                       firstName: profileData.firstName,
                       lastName: profileData.lastName,
-                      profilePicture: profileData.profilePicture
+                      profilePicture: profileData.removeExistingPicture 
+                        ? undefined 
+                        : (profileData.profilePicturePreview || profileData.profilePicture)
                     }}
                     size="xl"
                   />

@@ -20,6 +20,8 @@ export interface User {
   lastLogin?: string;
   profilePicture?: string;
   username?: string; // Added to match Django backend
+  phoneNumber?: string; // Added to match Django backend
+  bio?: string; // Added to match Django backend
 }
 
 export interface AuthTokens {

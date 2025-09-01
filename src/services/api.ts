@@ -511,7 +511,9 @@ export class ApiClient {
         isActive: data.is_active,
         dateJoined: data.date_joined,
         lastLogin: data.last_login,
-        profilePicture: data.profile_picture,
+        profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}` : undefined,
+        phoneNumber: data.phone_number,
+        bio: data.bio,
       };
 
       // Update cached user data
@@ -540,27 +542,57 @@ export class ApiClient {
     }
   }
 
-  async updateProfile(data: Partial<User>): Promise<ApiResponse<User>> {
+  async updateProfile(data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }): Promise<ApiResponse<User>> {
     try {
       const accessToken = localStorage.getItem(config.auth.tokenKey);
       if (!accessToken) {
         throw new ApiError('Authentication required', 401);
       }
 
-      // Transform frontend User fields to backend format
-      const backendData: any = {};
-      if (data.firstName !== undefined) backendData.first_name = data.firstName;
-      if (data.lastName !== undefined) backendData.last_name = data.lastName;
-      if (data.email !== undefined) backendData.email = data.email;
-      if (data.profilePicture !== undefined) backendData.profile_picture = data.profilePicture;
+      // Determine if we need to use FormData (for file uploads/removal) or JSON
+      const hasFileUpload = data.profilePictureFile instanceof File || data.removeProfilePicture;
+      
+      let requestBody: FormData | string;
+      let headers: Record<string, string> = {
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      if (hasFileUpload) {
+        // Use FormData for file uploads or removal
+        const formData = new FormData();
+        
+        if (data.firstName !== undefined) formData.append('first_name', data.firstName);
+        if (data.lastName !== undefined) formData.append('last_name', data.lastName);
+        if (data.email !== undefined) formData.append('email', data.email);
+        if (data.phoneNumber !== undefined) formData.append('phone_number', data.phoneNumber);
+        if (data.bio !== undefined) formData.append('bio', data.bio);
+        
+        if (data.profilePictureFile) {
+          formData.append('profile_picture', data.profilePictureFile);
+        } else if (data.removeProfilePicture) {
+          // Send empty string to clear the profile picture
+          formData.append('profile_picture', '');
+        }
+        
+        requestBody = formData;
+        // Don't set Content-Type header - let browser set it with boundary for FormData
+      } else {
+        // Use JSON for regular updates
+        const backendData: any = {};
+        if (data.firstName !== undefined) backendData.first_name = data.firstName;
+        if (data.lastName !== undefined) backendData.last_name = data.lastName;
+        if (data.email !== undefined) backendData.email = data.email;
+        if (data.phoneNumber !== undefined) backendData.phone_number = data.phoneNumber;
+        if (data.bio !== undefined) backendData.bio = data.bio;
+        
+        requestBody = JSON.stringify(backendData);
+        headers['Content-Type'] = 'application/json';
+      }
 
       const response = await fetch(`${config.api.baseUrl}/accounts/profile/`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(backendData),
+        headers,
+        body: requestBody,
         signal: AbortSignal.timeout(config.api.timeout),
       });
 
@@ -586,7 +618,9 @@ export class ApiClient {
         isActive: responseData.is_active,
         dateJoined: responseData.date_joined,
         lastLogin: responseData.last_login,
-        profilePicture: responseData.profile_picture,
+        profilePicture: responseData.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${responseData.profile_picture}` : undefined,
+        phoneNumber: responseData.phone_number,
+        bio: responseData.bio,
       };
 
       // Update cached user data
