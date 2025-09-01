@@ -55,10 +55,15 @@ export interface PasswordResetRequest {
   email: string;
 }
 
+export interface PasswordResetResponse {
+  user_id: string;
+  message: string;
+}
+
 export interface PasswordResetConfirmRequest {
-  token: string;
-  newPassword: string;
-  confirmPassword: string;
+  user_id: string;
+  otp: string;
+  password: string;
 }
 
 // Teacher types

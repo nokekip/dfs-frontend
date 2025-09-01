@@ -12,6 +12,7 @@ import {
   RegisterRequest,
   OTPVerificationRequest,
   PasswordResetRequest,
+  PasswordResetResponse,
   PasswordResetConfirmRequest,
   Teacher,
   TeacherCreateRequest,
@@ -67,12 +68,28 @@ export class ApiClient {
   }
 
   private getAuthHeader(): Record<string, string> {
-    const token = mockDataStore.getAuthToken();
+    // Try localStorage first (for integrated methods), then fallback to mockDataStore
+    const token = localStorage.getItem(config.auth.tokenKey) || mockDataStore.getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   private getCurrentUser(): User {
-    const user = mockDataStore.getCurrentUser();
+    // Try localStorage first (for integrated methods), then fallback to mockDataStore
+    const userFromStorage = localStorage.getItem(config.auth.userKey);
+    let user: User | null = null;
+    
+    if (userFromStorage) {
+      try {
+        user = JSON.parse(userFromStorage);
+      } catch (error) {
+        console.warn('Failed to parse user from localStorage:', error);
+      }
+    }
+    
+    if (!user) {
+      user = mockDataStore.getCurrentUser();
+    }
+    
     if (!user) {
       simulateError('Authentication required', 401);
     }
@@ -152,8 +169,9 @@ export class ApiClient {
         };
 
         // Save authentication state
-        mockDataStore.saveCurrentUser(user);
-        mockDataStore.saveAuthToken(tokens.access);
+        localStorage.setItem(config.auth.tokenKey, tokens.access);
+        localStorage.setItem(config.auth.refreshTokenKey, tokens.refresh);
+        localStorage.setItem(config.auth.userKey, JSON.stringify(user));
 
         return {
           success: true,
@@ -279,8 +297,9 @@ export class ApiClient {
       };
 
       // Save authentication state
-      mockDataStore.saveCurrentUser(user);
-      mockDataStore.saveAuthToken(tokens.access);
+      localStorage.setItem(config.auth.tokenKey, tokens.access);
+      localStorage.setItem(config.auth.refreshTokenKey, tokens.refresh);
+      localStorage.setItem(config.auth.userKey, JSON.stringify(user));
 
       return {
         success: true,
@@ -307,93 +326,293 @@ export class ApiClient {
   }
 
   async logout(): Promise<ApiResponse<{ message: string }>> {
-    await delay();
+    try {
+      // Try to get tokens from localStorage
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      const refreshToken = localStorage.getItem(config.auth.refreshTokenKey);
+      
+      // Call Django logout endpoint if we have tokens
+      if (accessToken && refreshToken) {
+        try {
+          const response = await fetch(`${config.api.baseUrl}/accounts/auth/logout/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              refresh_token: refreshToken,
+            }),
+            signal: AbortSignal.timeout(config.api.timeout),
+          });
 
-    const user = mockDataStore.getCurrentUser();
-    
-    // Clear authentication state
-    mockDataStore.saveCurrentUser(null);
-    mockDataStore.saveAuthToken(null);
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.warn('Logout API call failed:', data.error);
+            // Continue with local logout even if API call fails
+          }
+        } catch (error) {
+          console.warn('Logout API call error:', error);
+          // Continue with local logout even if API call fails
+        }
+      }
 
-    // Log activity if user was logged in
-    if (user) {
-      mockDataStore.addActivityLog({
-        user,
-        action: 'login', // logout action
-        description: 'logged out of the system',
-      });
-    }
+      // Always clear local authentication state
+      localStorage.removeItem(config.auth.tokenKey);
+      localStorage.removeItem(config.auth.refreshTokenKey);
+      localStorage.removeItem(config.auth.userKey);
 
-    return {
-      success: true,
-      data: { message: 'Logout successful' },
-      message: 'Logout successful',
-    };
-  }
-
-  async forgotPassword(data: PasswordResetRequest): Promise<ApiResponse<{ message: string }>> {
-    await delay();
-
-    const users = mockDataStore.getUsers();
-    const user = users.find(u => u.email === data.email);
-
-    if (!user) {
-      // Don't reveal if email exists for security
       return {
         success: true,
-        data: { message: 'If the email exists, a password reset link has been sent.' },
-        message: 'Password reset email sent',
+        data: { message: 'Logout successful' },
+        message: 'Logout successful',
+      };
+
+    } catch (error) {
+      // Even if logout fails, clear local state
+      localStorage.removeItem(config.auth.tokenKey);
+      localStorage.removeItem(config.auth.refreshTokenKey);
+      localStorage.removeItem(config.auth.userKey);
+
+      return {
+        success: true,
+        data: { message: 'Logout successful' },
+        message: 'Logout successful',
       };
     }
+  }
 
-    return {
-      success: true,
-      data: { message: 'Password reset link has been sent to your email.' },
-      message: 'Password reset email sent',
-    };
+  async forgotPassword(data: PasswordResetRequest): Promise<ApiResponse<PasswordResetResponse>> {
+    try {
+      const response = await fetch(`${config.api.baseUrl}/accounts/auth/forgot-password/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+        }),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new ApiError(responseData.error || 'Failed to send password reset email', response.status);
+      }
+
+      return {
+        success: true,
+        data: {
+          user_id: responseData.user_id,
+          message: responseData.message,
+        },
+        message: responseData.message || 'Password reset email sent',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred while sending password reset email', 500);
+    }
+  }
+
+  async resetPassword(data: PasswordResetConfirmRequest): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const response = await fetch(`${config.api.baseUrl}/accounts/auth/reset-password/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: data.user_id,
+          otp: data.otp,
+          password: data.password,
+        }),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new ApiError(responseData.error || 'Failed to reset password', response.status);
+      }
+
+      return {
+        success: true,
+        data: { message: responseData.message },
+        message: responseData.message || 'Password reset successfully',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred while resetting password', 500);
+    }
   }
 
   // Profile Methods
   async getProfile(): Promise<ApiResponse<User>> {
-    await delay();
-    
-    const user = this.getCurrentUser();
-    
-    return {
-      success: true,
-      data: user,
-      message: 'Profile retrieved successfully',
-    };
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new ApiError('Authentication required', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/accounts/profile/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, clear auth state
+          localStorage.removeItem(config.auth.tokenKey);
+          localStorage.removeItem(config.auth.refreshTokenKey);
+          localStorage.removeItem(config.auth.userKey);
+        }
+        throw new ApiError(data.error || 'Failed to get profile', response.status);
+      }
+
+      const user: User = {
+        id: data.id,
+        email: data.email,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        role: data.role,
+        username: data.username,
+        isActive: data.is_active,
+        dateJoined: data.date_joined,
+        lastLogin: data.last_login,
+        profilePicture: data.profile_picture,
+      };
+
+      // Update cached user data
+      localStorage.setItem(config.auth.userKey, JSON.stringify(user));
+
+      return {
+        success: true,
+        data: user,
+        message: 'Profile retrieved successfully',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred while getting profile', 500);
+    }
   }
 
   async updateProfile(data: Partial<User>): Promise<ApiResponse<User>> {
-    await delay();
-
-    const currentUser = this.getCurrentUser();
-    const users = mockDataStore.getUsers();
-    
-    const updatedUser = { ...currentUser, ...data, updatedAt: new Date().toISOString() };
-    const updatedUsers = users.map(u => u.id === currentUser.id ? updatedUser : u);
-    
-    mockDataStore.saveUsers(updatedUsers);
-    mockDataStore.saveCurrentUser(updatedUser);
-
-    // Update teacher profile if user is teacher
-    if (updatedUser.role === 'teacher') {
-      const teachers = mockDataStore.getTeachers();
-      const teacherIndex = teachers.findIndex(t => t.user.id === updatedUser.id);
-      if (teacherIndex !== -1) {
-        teachers[teacherIndex].user = updatedUser;
-        teachers[teacherIndex].updatedAt = new Date().toISOString();
-        mockDataStore.saveTeachers(teachers);
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new ApiError('Authentication required', 401);
       }
-    }
 
-    return {
-      success: true,
-      data: updatedUser,
-      message: 'Profile updated successfully',
-    };
+      // Transform frontend User fields to backend format
+      const backendData: any = {};
+      if (data.firstName !== undefined) backendData.first_name = data.firstName;
+      if (data.lastName !== undefined) backendData.last_name = data.lastName;
+      if (data.email !== undefined) backendData.email = data.email;
+      if (data.profilePicture !== undefined) backendData.profile_picture = data.profilePicture;
+
+      const response = await fetch(`${config.api.baseUrl}/accounts/profile/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(backendData),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, clear auth state
+          localStorage.removeItem(config.auth.tokenKey);
+          localStorage.removeItem(config.auth.refreshTokenKey);
+          localStorage.removeItem(config.auth.userKey);
+        }
+        throw new ApiError(responseData.error || 'Failed to update profile', response.status);
+      }
+
+      const updatedUser: User = {
+        id: responseData.id,
+        email: responseData.email,
+        firstName: responseData.first_name,
+        lastName: responseData.last_name,
+        role: responseData.role,
+        username: responseData.username,
+        isActive: responseData.is_active,
+        dateJoined: responseData.date_joined,
+        lastLogin: responseData.last_login,
+        profilePicture: responseData.profile_picture,
+      };
+
+      // Update cached user data
+      localStorage.setItem(config.auth.userKey, JSON.stringify(updatedUser));
+
+      return {
+        success: true,
+        data: updatedUser,
+        message: 'Profile updated successfully',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred while updating profile', 500);
+    }
   }
 
   // Teacher Methods
@@ -496,10 +715,6 @@ export class ApiClient {
       updatedAt: new Date().toISOString(),
     };
 
-    // Add password to credentials (in real app this would be hashed)
-    // TODO: For now we skip credential storage since it's not implemented in mockDataStore
-    // In a real app, this would store the hashed password in the database
-    
     users.push(newUser);
     const teachers = mockDataStore.getTeachers();
     teachers.push(newTeacher);

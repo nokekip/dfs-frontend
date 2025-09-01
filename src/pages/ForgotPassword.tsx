@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useGlobalSettings } from '../contexts/SettingsContext';
+import { apiClient } from '../services/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -20,6 +21,7 @@ import {
 export default function ForgotPassword() {
   const [step, setStep] = useState<'email' | 'sent' | 'reset'>('email');
   const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState(''); // Store user_id from forgot password response
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,17 +36,11 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      // Simulate API call - in real app, this would be a Django REST API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock validation
-      if (!email.includes('@')) {
-        throw new Error('Please enter a valid email address');
-      }
-
+      const response = await apiClient.forgotPassword({ email });
+      setUserId(response.data.user_id);
       setStep('sent');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset email');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
@@ -56,17 +52,13 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock validation - in real app, this would verify with backend
-      if (resetCode === '123456') {
-        setStep('reset');
-      } else {
-        throw new Error('Invalid verification code');
+      // Just validate the code format and move to reset step
+      if (resetCode.length !== 6) {
+        throw new Error('Please enter a 6-digit verification code');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
+      setStep('reset');
+    } catch (err: any) {
+      setError(err.message || 'Please enter a valid verification code');
     } finally {
       setIsLoading(false);
     }
@@ -89,13 +81,16 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await apiClient.resetPassword({
+        user_id: userId,
+        otp: resetCode,
+        password: newPassword,
+      });
       
       // Redirect to login page with success message
       window.location.href = '/login?reset=success';
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset password');
     } finally {
       setIsLoading(false);
     }
@@ -104,9 +99,11 @@ export default function ForgotPassword() {
   const handleResendCode = async () => {
     setIsLoading(true);
     try {
-      // Simulate resend
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Success feedback would be shown here
+      const response = await apiClient.forgotPassword({ email });
+      setUserId(response.data.user_id);
+      // Show success feedback or toast here if needed
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend code');
     } finally {
       setIsLoading(false);
     }
