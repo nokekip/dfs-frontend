@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { useGlobalSettings } from '../contexts/SettingsContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -26,15 +25,14 @@ export default function AdminSettings() {
     securitySettings, 
     isLoading, 
     updateSystemSettings, 
-    updateSecuritySettings 
+    updateSecuritySettings,
+    refresh
   } = useSettings('admin');
-  
-  const { refreshSettings } = useGlobalSettings();
-  
-  // Initialize local state with default values
+
+  // Initialize local state with empty values - will be populated from backend
   const [localSystemSettings, setLocalSystemSettings] = useState({
-    siteName: 'Digital Filing System for Teachers',
-    siteDescription: 'Kenya Teacher Document Management System',
+    siteName: '',
+    siteDescription: '',
     maxFileSize: '10', // MB
     allowedFileTypes: 'pdf,docx,xlsx,pptx,jpg,png',
     sessionTimeout: '30', // minutes
@@ -43,24 +41,26 @@ export default function AdminSettings() {
     requireAdminApproval: true
   });
 
-  // Security Settings
+  // Security Settings - Initialize with empty values
   const [localSecuritySettings, setLocalSecuritySettings] = useState({
-    twoFactorRequired: true,
-    enableAuditLogs: true
+    twoFactorRequired: false,
+    enableAuditLogs: false
   });
 
   // Update local state when settings are loaded
   useEffect(() => {
     if (systemSettings) {
       setLocalSystemSettings({
-        siteName: systemSettings.siteName || 'Digital Filing System for Teachers',
-        siteDescription: systemSettings.siteDescription || 'Kenya Teacher Document Management System',
+        siteName: systemSettings.siteName || '',
+        siteDescription: systemSettings.siteDescription || '',
         maxFileSize: systemSettings.maxFileSize?.toString() || '10',
-        allowedFileTypes: systemSettings.allowedFileTypes || 'pdf,docx,xlsx,pptx,jpg,png',
+        allowedFileTypes: Array.isArray(systemSettings.allowedFileTypes) 
+          ? systemSettings.allowedFileTypes.join(',') 
+          : 'pdf,docx,xlsx,pptx,jpg,png',
         sessionTimeout: systemSettings.sessionTimeout?.toString() || '30',
         maintenanceMode: systemSettings.maintenanceMode || false,
-        registrationEnabled: systemSettings.registrationEnabled || true,
-        requireAdminApproval: systemSettings.requireAdminApproval || true
+        registrationEnabled: systemSettings.registrationEnabled !== undefined ? systemSettings.registrationEnabled : true,
+        requireAdminApproval: systemSettings.requireAdminApproval !== undefined ? systemSettings.requireAdminApproval : true
       });
     }
   }, [systemSettings]);
@@ -68,8 +68,8 @@ export default function AdminSettings() {
   useEffect(() => {
     if (securitySettings) {
       setLocalSecuritySettings({
-        twoFactorRequired: securitySettings.twoFactorRequired || true,
-        enableAuditLogs: securitySettings.enableAuditLogs || true
+        twoFactorRequired: securitySettings.twoFactorRequired !== undefined ? securitySettings.twoFactorRequired : false,
+        enableAuditLogs: securitySettings.enableAuditLogs !== undefined ? securitySettings.enableAuditLogs : false
       });
     }
   }, [securitySettings]);
@@ -80,7 +80,10 @@ export default function AdminSettings() {
         siteName: localSystemSettings.siteName,
         siteDescription: localSystemSettings.siteDescription,
         maxFileSize: parseInt(localSystemSettings.maxFileSize),
-        allowedFileTypes: localSystemSettings.allowedFileTypes,
+        allowedFileTypes: localSystemSettings.allowedFileTypes
+          .split(',')
+          .map(type => type.trim())
+          .filter(type => type.length > 0),
         sessionTimeout: parseInt(localSystemSettings.sessionTimeout),
         maintenanceMode: localSystemSettings.maintenanceMode,
         registrationEnabled: localSystemSettings.registrationEnabled,
@@ -89,8 +92,9 @@ export default function AdminSettings() {
 
       const success = await updateSystemSettings(updatedSettings);
       if (success) {
-        // Refresh global settings to update UI throughout the app
-        await refreshSettings();
+        // The useSettings hook automatically updates its state after successful update
+        // But we can call refresh to ensure we have the latest data
+        refresh();
       }
     } catch (error) {
       toast.error('Failed to save system settings');
@@ -104,13 +108,17 @@ export default function AdminSettings() {
         enableAuditLogs: localSecuritySettings.enableAuditLogs
       };
 
-      await updateSecuritySettings(updatedSettings);
+      const success = await updateSecuritySettings(updatedSettings);
+      if (success) {
+        // The useSettings hook automatically updates its state after successful update
+        refresh();
+      }
     } catch (error) {
       toast.error('Failed to save security settings');
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !systemSettings) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">

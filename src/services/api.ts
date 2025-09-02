@@ -1140,61 +1140,210 @@ export class ApiClient {
 
   // Settings Methods
   async getSystemSettings(): Promise<ApiResponse<SystemSettings>> {
-    await delay();
-
     this.requireRole('admin');
-    const settings = mockDataStore.getSystemSettings();
+    
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
 
-    return {
-      success: true,
-      data: settings,
-      message: 'System settings retrieved successfully',
-    };
+      const response = await fetch(`${config.api.baseUrl}/settings/system/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      const data = responseData.data;
+      
+      // Convert snake_case to camelCase for frontend
+      const settings: SystemSettings = {
+        siteName: data.site_name,
+        siteDescription: data.site_description,
+        maxFileSize: data.max_file_size,
+        allowedFileTypes: data.allowed_file_types,
+        sessionTimeout: data.session_timeout,
+        maintenanceMode: data.maintenance_mode,
+        registrationEnabled: data.registration_enabled,
+        requireAdminApproval: data.require_admin_approval,
+      };
+
+      return {
+        success: true,
+        data: settings,
+        message: responseData.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to fetch system settings',
+      };
+    }
   }
 
-  async updateSystemSettings(data: Partial<SystemSettings>): Promise<ApiResponse<SystemSettings>> {
-    await delay();
-
+  async updateSystemSettings(settings: Partial<SystemSettings>): Promise<ApiResponse<SystemSettings>> {
     this.requireRole('admin');
-    const currentSettings = mockDataStore.getSystemSettings();
-    const updatedSettings = { ...currentSettings, ...data };
     
-    mockDataStore.saveSystemSettings(updatedSettings);
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
 
-    return {
-      success: true,
-      data: updatedSettings,
-      message: 'System settings updated successfully',
-    };
+      // Convert camelCase to snake_case for backend
+      const backendData: any = {};
+      if (settings.siteName !== undefined) backendData.site_name = settings.siteName;
+      if (settings.siteDescription !== undefined) backendData.site_description = settings.siteDescription;
+      if (settings.maxFileSize !== undefined) backendData.max_file_size = settings.maxFileSize;
+      if (settings.allowedFileTypes !== undefined) {
+        // allowedFileTypes should already be an array from AdminSettings component
+        backendData.allowed_file_types = settings.allowedFileTypes;
+      }
+      if (settings.sessionTimeout !== undefined) backendData.session_timeout = settings.sessionTimeout;
+      if (settings.maintenanceMode !== undefined) backendData.maintenance_mode = settings.maintenanceMode;
+      if (settings.registrationEnabled !== undefined) backendData.registration_enabled = settings.registrationEnabled;
+      if (settings.requireAdminApproval !== undefined) backendData.require_admin_approval = settings.requireAdminApproval;
+
+      const response = await fetch(`${config.api.baseUrl}/settings/system/`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(backendData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      const responseSettings = responseData.data;
+      
+      // Convert snake_case to camelCase for frontend
+      const updatedSettings: SystemSettings = {
+        siteName: responseSettings.site_name,
+        siteDescription: responseSettings.site_description,
+        maxFileSize: responseSettings.max_file_size,
+        allowedFileTypes: responseSettings.allowed_file_types,
+        sessionTimeout: responseSettings.session_timeout,
+        maintenanceMode: responseSettings.maintenance_mode,
+        registrationEnabled: responseSettings.registration_enabled,
+        requireAdminApproval: responseSettings.require_admin_approval,
+      };
+
+      return {
+        success: true,
+        data: updatedSettings,
+        message: responseData.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update system settings',
+      };
+    }
   }
 
   async getSecuritySettings(): Promise<ApiResponse<SecuritySettings>> {
-    await delay();
-
     this.requireRole('admin');
-    const settings = mockDataStore.getSecuritySettings();
+    
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
 
-    return {
-      success: true,
-      data: settings,
-      message: 'Security settings retrieved successfully',
-    };
+      const response = await fetch(`${config.api.baseUrl}/settings/security/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      const data = responseData.data;
+      
+      // Convert snake_case to camelCase for frontend
+      const settings: SecuritySettings = {
+        twoFactorRequired: data.two_factor_required,
+        enableAuditLogs: false, // This field doesn't exist in backend yet, defaulting to false
+      };
+
+      return {
+        success: true,
+        data: settings,
+        message: responseData.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to fetch security settings',
+      };
+    }
   }
 
-  async updateSecuritySettings(data: Partial<SecuritySettings>): Promise<ApiResponse<SecuritySettings>> {
-    await delay();
-
+  async updateSecuritySettings(settings: Partial<SecuritySettings>): Promise<ApiResponse<SecuritySettings>> {
     this.requireRole('admin');
-    const currentSettings = mockDataStore.getSecuritySettings();
-    const updatedSettings = { ...currentSettings, ...data };
     
-    mockDataStore.saveSecuritySettings(updatedSettings);
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
 
-    return {
-      success: true,
-      data: updatedSettings,
-      message: 'Security settings updated successfully',
-    };
+      // Convert camelCase to snake_case for backend
+      const backendData: any = {};
+      if (settings.twoFactorRequired !== undefined) backendData.two_factor_required = settings.twoFactorRequired;
+      // Note: enableAuditLogs is not implemented in backend yet
+
+      const response = await fetch(`${config.api.baseUrl}/settings/security/`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(backendData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      const responseSettings = responseData.data;
+      
+      // Convert snake_case to camelCase for frontend
+      const updatedSettings: SecuritySettings = {
+        twoFactorRequired: responseSettings.two_factor_required,
+        enableAuditLogs: false, // This field doesn't exist in backend yet, defaulting to false
+      };
+
+      return {
+        success: true,
+        data: updatedSettings,
+        message: responseData.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update security settings',
+      };
+    }
   }
 
   // Activity Methods

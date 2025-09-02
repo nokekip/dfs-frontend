@@ -39,42 +39,27 @@ export const useSettings = (userRole: 'admin' | 'teacher'): SettingsState & Sett
     error: null,
   });
 
-  const fetchSystemSettings = useCallback(async (): Promise<void> => {
-    // Only admin can fetch system settings
+  const fetchSystemSettings = useCallback(async () => {
     if (userRole !== 'admin') return;
-
+    
     setState(prev => ({ ...prev, isLoading: true, error: null }));
-
+    
     try {
       const response = await apiClient.getSystemSettings();
-      
-      if (response.success && response.data) {
+      if (response.success) {
         setState(prev => ({
           ...prev,
-          systemSettings: response.data!,
+          systemSettings: response.data,
           isLoading: false,
-        }));
-      } else {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'Failed to fetch system settings',
         }));
       }
     } catch (error) {
-      const errorMessage = error instanceof ApiError 
-        ? error.message 
-        : 'Failed to fetch system settings. Please try again.';
-
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch system settings';
       setState(prev => ({
         ...prev,
         isLoading: false,
         error: errorMessage,
       }));
-
-      toast.error('Fetch Failed', {
-        description: errorMessage,
-      });
     }
   }, [userRole]);
 
