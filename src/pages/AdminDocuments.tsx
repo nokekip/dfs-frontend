@@ -45,7 +45,7 @@ import { useTeachers } from '../hooks/useTeachers';
 import { toast } from 'sonner';
 
 export default function AdminDocuments() {
-  const { documents, isLoading, deleteDocument } = useDocuments();
+  const { documents, isLoading, deleteDocument, flagDocument, archiveDocument } = useDocuments();
   const { categories } = useCategories();
   const { teachers } = useTeachers();
   const [filteredDocuments, setFilteredDocuments] = useState(documents);
@@ -56,6 +56,29 @@ export default function AdminDocuments() {
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const getFileIcon = (fileType: string) => {
+    if (!fileType) return <File className="h-5 w-5 text-gray-500" />;
+    
+    const type = fileType.toLowerCase();
+    
+    // Handle file extensions and MIME types for images
+    if (type.includes('image') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(type)) {
+      return <Image className="h-5 w-5 text-green-500" />;
+    }
+    
+    // Handle file extensions and MIME types for PDFs
+    if (type.includes('pdf') || type === 'pdf') {
+      return <FileText className="h-5 w-5 text-red-500" />;
+    }
+    
+    // Handle file extensions and MIME types for documents
+    if (type.includes('document') || type.includes('word') || ['doc', 'docx'].includes(type)) {
+      return <FileText className="h-5 w-5 text-blue-600" />;
+    }
+    
+    return <File className="h-5 w-5 text-gray-500" />;
+  };
 
   // Initialize filtered documents when documents change
   useEffect(() => {
@@ -78,39 +101,29 @@ export default function AdminDocuments() {
     setFilteredDocuments(filtered);
   }, [documents, searchQuery, categoryFilter, statusFilter, uploaderFilter]);
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType?.includes('image') || fileType === 'JPG' || fileType === 'PNG') {
-      return <Image className="h-5 w-5 text-blue-500" />;
-    }
-    if (fileType?.includes('pdf') || fileType === 'PDF') {
-      return <FileText className="h-5 w-5 text-red-500" />;
-    }
-    if (fileType?.includes('document') || fileType?.includes('word')) {
-      return <FileText className="h-5 w-5 text-blue-600" />;
-    }
-    return <File className="h-5 w-5 text-gray-500" />;
-  };
-
   const getFileTypeDisplay = (fileType: string) => {
-    if (fileType?.includes('pdf')) {
-      return 'PDF';
-    }
-    if (fileType?.includes('document') || fileType?.includes('word')) {
-      return 'DOCX';
-    }
-    if (fileType?.includes('sheet') || fileType?.includes('excel')) {
-      return 'XLSX';
-    }
-    if (fileType?.includes('presentation') || fileType?.includes('powerpoint')) {
-      return 'PPTX';
-    }
-    if (fileType?.includes('image')) {
-      return 'Image';
-    }
-    if (fileType?.includes('text')) {
-      return 'TXT';
-    }
-    return fileType?.split('/')[1]?.toUpperCase() || 'File';
+    if (!fileType) return 'File';
+    
+    const type = fileType.toLowerCase();
+    
+    // Handle file extensions (from backend file_type field)
+    if (type === 'pdf') return 'PDF';
+    if (type === 'doc' || type === 'docx') return 'DOCX';
+    if (type === 'xls' || type === 'xlsx') return 'XLSX';
+    if (type === 'ppt' || type === 'pptx') return 'PPTX';
+    if (type === 'txt') return 'TXT';
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(type)) return 'Image';
+    
+    // Handle MIME types (fallback)
+    if (type.includes('pdf')) return 'PDF';
+    if (type.includes('document') || type.includes('word')) return 'DOCX';
+    if (type.includes('sheet') || type.includes('excel')) return 'XLSX';
+    if (type.includes('presentation') || type.includes('powerpoint')) return 'PPTX';
+    if (type.includes('image')) return 'Image';
+    if (type.includes('text')) return 'TXT';
+    
+    // Return the extension or type as uppercase
+    return type.split('/').pop()?.toUpperCase() || fileType.toUpperCase();
   };
 
   const formatDate = (dateString: string) => {
@@ -176,14 +189,18 @@ export default function AdminDocuments() {
     }
   };
 
-  const handleFlagDocument = (document: any) => {
-    // In real app, this would call an API to flag/unflag
-    toast.success(`Document ${document.status === 'flagged' ? 'unflagged' : 'flagged'} successfully!`);
+  const handleFlagDocument = async (document: any) => {
+    const success = await flagDocument(document.id);
+    if (!success) {
+      toast.error('Failed to update document status');
+    }
   };
 
-  const handleArchiveDocument = (document: any) => {
-    // In real app, this would call an API to archive/unarchive
-    toast.success(`Document ${document.status === 'archived' ? 'unarchived' : 'archived'} successfully!`);
+  const handleArchiveDocument = async (document: any) => {
+    const success = await archiveDocument(document.id);
+    if (!success) {
+      toast.error('Failed to update document status');
+    }
   };
 
   const activeDocuments = documents.filter(d => d.status === 'active').length;

@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { 
   Document, 
+  DocumentStatus,
   DocumentCreateRequest, 
   DocumentUpdateRequest, 
   DocumentShareRequest,
@@ -28,6 +29,8 @@ interface DocumentsActions {
   revokeShare: (documentId: string) => Promise<boolean>;
   deleteDocument: (documentId: string) => Promise<boolean>;
   downloadDocument: (documentId: string) => Promise<boolean>;
+  flagDocument: (documentId: string) => Promise<boolean>;
+  archiveDocument: (documentId: string) => Promise<boolean>;
   refresh: () => void;
   clearError: () => void;
 }
@@ -132,24 +135,26 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Note: This would be implemented when we add the update document endpoint
-      // For now, we'll simulate the update locally
+      const response = await apiClient.updateDocument(documentId, data);
       
-      setState(prev => ({
-        ...prev,
-        documents: prev.documents.map(doc => 
-          doc.id === documentId 
-            ? { ...doc, ...data, updatedAt: new Date().toISOString() }
-            : doc
-        ),
-        isLoading: false,
-      }));
+      if (response.success && response.data) {
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.map(doc => 
+            doc.id === documentId ? response.data! : doc
+          ),
+          isLoading: false,
+        }));
 
-      toast.success('Document Updated', {
-        description: 'Document has been updated successfully.',
-      });
+        toast.success('Document Updated', {
+          description: 'Document has been updated successfully.',
+        });
 
-      return true;
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
     } catch (error) {
       const errorMessage = error instanceof ApiError 
         ? error.message 
@@ -277,22 +282,25 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Note: This would be implemented when we add the delete document endpoint
-      // For now, we'll simulate the deletion locally
-      
       const documentToDelete = state.documents.find(doc => doc.id === documentId);
+      const response = await apiClient.deleteDocument(documentId);
       
-      setState(prev => ({
-        ...prev,
-        documents: prev.documents.filter(doc => doc.id !== documentId),
-        isLoading: false,
-      }));
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.filter(doc => doc.id !== documentId),
+          isLoading: false,
+        }));
 
-      toast.success('Document Deleted', {
-        description: `"${documentToDelete?.title}" has been deleted successfully.`,
-      });
+        toast.success('Document Deleted', {
+          description: `"${documentToDelete?.title}" has been deleted successfully.`,
+        });
 
-      return true;
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
     } catch (error) {
       const errorMessage = error instanceof ApiError 
         ? error.message 
@@ -353,6 +361,98 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     }
   }, [state.documents]);
 
+  const flagDocument = useCallback(async (documentId: string): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await apiClient.flagDocument(documentId);
+      
+      if (response.success && response.data) {
+        // Update the document status in local state
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.map(doc => 
+            doc.id === documentId 
+              ? { ...doc, status: response.data!.document_status as DocumentStatus }
+              : doc
+          ),
+          isLoading: false,
+        }));
+
+        toast.success('Document Status Updated', {
+          description: response.message,
+        });
+
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof ApiError 
+        ? error.message 
+        : 'Failed to update document status. Please try again.';
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+
+      toast.error('Action Failed', {
+        description: errorMessage,
+      });
+
+      return false;
+    }
+  }, []);
+
+  const archiveDocument = useCallback(async (documentId: string): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const response = await apiClient.archiveDocument(documentId);
+      
+      if (response.success && response.data) {
+        // Update the document status in local state
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.map(doc => 
+            doc.id === documentId 
+              ? { ...doc, status: response.data!.document_status as DocumentStatus }
+              : doc
+          ),
+          isLoading: false,
+        }));
+
+        toast.success('Document Status Updated', {
+          description: response.message,
+        });
+
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof ApiError 
+        ? error.message 
+        : 'Failed to update document status. Please try again.';
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+
+      toast.error('Action Failed', {
+        description: errorMessage,
+      });
+
+      return false;
+    }
+  }, []);
+
   const refresh = useCallback(() => {
     fetchDocuments();
   }, [fetchDocuments]);
@@ -375,6 +475,8 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     revokeShare,
     deleteDocument,
     downloadDocument,
+    flagDocument,
+    archiveDocument,
     refresh,
     clearError,
   };
