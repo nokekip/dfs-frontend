@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDocuments } from '../hooks/useDocuments';
 import { useCategories } from '../hooks/useCategories';
+import { useSystemSettings } from '../hooks/useSystemSettings';
 import { useDashboard } from '../hooks/useDashboard';
 import Layout from '../components/Layout';
 import { Loading } from '../components/Loading';
@@ -50,6 +51,12 @@ export default function TeacherDashboard() {
     fetchCategories 
   } = useCategories();
   const { 
+    settings,
+    isLoading: settingsLoading,
+    error: settingsError,
+    fetchSettings
+  } = useSystemSettings();
+  const { 
     stats, 
     isLoading: statsLoading, 
     error: statsError, 
@@ -70,9 +77,10 @@ export default function TeacherDashboard() {
     fetchCategories();
     fetchDocuments();
     fetchDashboardStats();
-  }, [fetchCategories, fetchDocuments, fetchDashboardStats]);
+    fetchSettings();
+  }, [fetchCategories, fetchDocuments, fetchDashboardStats, fetchSettings]);
 
-  const selectedCategory = categories.find(cat => cat.id === uploadForm.category);
+  const selectedCategory = categories.find(cat => cat.id.toString() === uploadForm.category);
   const recentFiles = documents.slice(0, 5); // Show 5 most recent documents
 
   const handleFileUpload = async (e: React.FormEvent) => {
@@ -124,6 +132,37 @@ export default function TeacherDashboard() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Get file extension
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      // Check file type if settings are available
+      if (settings && settings.allowed_file_types) {
+        if (!fileExtension || !settings.allowed_file_types.includes(fileExtension)) {
+          toast.error('Invalid file type', {
+            description: `Please select a file with one of these extensions: ${settings.allowed_file_types.join(', ')}`
+          });
+          e.target.value = '';
+          return;
+        }
+      }
+      
+      // Check file size if settings are available
+      if (settings && settings.max_file_size) {
+        if (file.size > settings.max_file_size) {
+          toast.error('File too large', {
+            description: `File size must be less than ${(settings.max_file_size / (1024 * 1024)).toFixed(0)}MB`
+          });
+          e.target.value = '';
+          return;
+        }
+      } else if (file.size > 10 * 1024 * 1024) { // Default 10MB limit
+        toast.error('File too large', {
+          description: 'File size must be less than 10MB'
+        });
+        e.target.value = '';
+        return;
+      }
+
       setUploadForm(prev => ({
         ...prev,
         file,
@@ -182,7 +221,7 @@ export default function TeacherDashboard() {
   };
 
   // Loading state
-  if (documentsLoading || categoriesLoading || statsLoading) {
+  if (documentsLoading || categoriesLoading || statsLoading || settingsLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -193,7 +232,7 @@ export default function TeacherDashboard() {
   }
 
   // Error state
-  if (documentsError || categoriesError || statsError) {
+  if (documentsError || categoriesError || statsError || settingsError) {
     return (
       <Layout>
         <ErrorMessage message={documentsError || categoriesError || statsError || 'Unknown error'} />
@@ -289,12 +328,19 @@ export default function TeacherDashboard() {
                   <Input
                     id="file"
                     type="file"
-                    accept=".pdf,.docx,.xlsx,.pptx,.jpg,.png"
+                    accept={settings?.allowed_file_types?.map(type => `.${type}`).join(',') || '.pdf,.docx,.xlsx,.pptx,.jpg,.png'}
                     onChange={handleFileChange}
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Supported formats: PDF, DOCX, XLSX, PPTX, JPG, PNG (Max 10MB)
+                    {settings ? (
+                      <>
+                        Supported formats: {settings.allowed_file_types?.join(', ').toUpperCase() || 'PDF, DOCX, XLSX, PPTX, JPG, PNG'} 
+                        (Max {settings.max_file_size ? `${(settings.max_file_size / (1024 * 1024)).toFixed(0)}MB` : '10MB'})
+                      </>
+                    ) : (
+                      'Supported formats: PDF, DOCX, XLSX, PPTX, JPG, PNG (Max 10MB)'
+                    )}
                   </p>
                 </div>
 
@@ -306,18 +352,26 @@ export default function TeacherDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                        <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedCategory && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedCategory.requiresClassSubject 
+                        ? 'This category requires class and subject information'
+                        : 'No additional requirements for this category'
+                      }
+                    </p>
+                  )}
                 </div>
 
                 {selectedCategory?.requiresClassSubject && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="class">Class</Label>
+                      <Label htmlFor="class">Class *</Label>
                       <Select value={uploadForm.class} onValueChange={(value) => handleInputChange('class', value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select class" />
@@ -336,7 +390,7 @@ export default function TeacherDashboard() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="subject">Subject</Label>
+                      <Label htmlFor="subject">Subject *</Label>
                       <Select value={uploadForm.subject} onValueChange={(value) => handleInputChange('subject', value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select subject" />

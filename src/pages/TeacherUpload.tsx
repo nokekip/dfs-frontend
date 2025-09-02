@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -23,10 +23,12 @@ import {
   Eye,
   Download,
   Clock,
-  Paperclip
+  Paperclip,
+  Info
 } from 'lucide-react';
 import { useCategories } from '../hooks/useCategories';
 import { useDocuments } from '../hooks/useDocuments';
+import { useSystemSettings } from '../hooks/useSystemSettings';
 
 interface UploadFile {
   id: string;
@@ -43,11 +45,16 @@ interface UploadFile {
 
 export default function TeacherUpload() {
   const { categories, isLoading: categoriesLoading } = useCategories();
+  const { settings, isLoading: settingsLoading } = useSystemSettings();
   const { uploadDocument } = useDocuments();
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get allowed file types and max file size from system settings
+  const allowedFileTypes = settings?.allowedFileTypes || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
+  const maxFileSize = (settings?.maxFileSize || 10) * 1024 * 1024; // Convert MB to bytes
 
   const getFileIcon = (fileType: string) => {
     if (fileType.includes('image')) return <Image className="h-6 w-6" />;
@@ -63,26 +70,20 @@ export default function TeacherUpload() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const validateFile = (file: File): string | null => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'image/jpeg',
-      'image/jpg',
-      'image/png'
-    ];
+  const getFileTypeFromExtension = (fileName: string): string => {
+    const extension = fileName.split('.').pop()?.toLowerCase() || '';
+    return extension;
+  };
 
-    if (!allowedTypes.includes(file.type)) {
-      return 'Invalid file type. Please upload PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, JPG, or PNG files.';
+  const validateFile = (file: File): string | null => {
+    const fileExtension = getFileTypeFromExtension(file.name);
+    
+    if (!allowedFileTypes.includes(fileExtension)) {
+      return `Invalid file type. Allowed types: ${allowedFileTypes.join(', ').toUpperCase()}`;
     }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      return 'File size exceeds 10MB limit.';
+    if (file.size > maxFileSize) {
+      return `File size exceeds ${settings?.maxFileSize || 10}MB limit.`;
     }
 
     return null;
@@ -248,13 +249,13 @@ export default function TeacherUpload() {
   };
 
   const getSelectedCategory = (categoryId: string) => {
-    return categories.find(cat => cat.id === categoryId);
+    return categories.find(cat => cat.id.toString() === categoryId);
   };
 
   const canUploadFile = (file: UploadFile) => {
     const category = getSelectedCategory(file.category);
     return file.title && file.category && file.status !== 'error' && 
-           (!category?.requiresClassSubject || (file.class && file.subject));
+                      (!category?.requires_class_subject || (file.class && file.subject));
   };
 
   const readyToUploadCount = uploadFiles.filter(canUploadFile).length;
@@ -288,6 +289,27 @@ export default function TeacherUpload() {
           )}
         </div>
 
+        {/* System Settings Loading */}
+        {settingsLoading && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Loading system settings...
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* File Type Information */}
+        {settings && (
+          <Alert className="bg-info/10 border-info/20">
+            <Info className="h-4 w-4 text-info" />
+            <AlertDescription className="text-info-foreground">
+              <strong>Allowed file types:</strong> {allowedFileTypes.join(', ').toUpperCase()} • 
+              <strong> Max file size:</strong> {settings.maxFileSize}MB
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Upload Area */}
         <Card>
           <CardContent className="p-6">
@@ -308,13 +330,14 @@ export default function TeacherUpload() {
               <div className="mt-4">
                 <h3 className="text-lg font-semibold">Drop files here or click to browse</h3>
                 <p className="text-muted-foreground mt-1">
-                  Support for PDF, DOCX, XLSX, PPTX, JPG, PNG (Max 10MB each)
+                  Support for {allowedFileTypes.join(', ').toUpperCase()} (Max {settings?.maxFileSize || 10}MB each)
                 </p>
               </div>
               <Button
                 variant="outline"
                 className="mt-4"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={settingsLoading}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Select Files
@@ -323,7 +346,7 @@ export default function TeacherUpload() {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                accept={allowedFileTypes.map(type => `.${type}`).join(',')}
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -428,7 +451,7 @@ export default function TeacherUpload() {
                               </SelectTrigger>
                               <SelectContent>
                                 {categories.map((category) => (
-                                  <SelectItem key={category.id} value={category.id}>
+                                  <SelectItem key={category.id} value={category.id.toString()}>
                                     {category.name}
                                   </SelectItem>
                                 ))}
@@ -436,7 +459,7 @@ export default function TeacherUpload() {
                             </Select>
                           </div>
 
-                          {category?.requiresClassSubject && (
+                                                    {category?.requires_class_subject && (
                             <>
                               <div className="space-y-2">
                                 <Label>Class *</Label>
@@ -520,32 +543,71 @@ export default function TeacherUpload() {
           </div>
         )}
 
-        {/* Upload Tips */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Upload Tips</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <h4 className="font-medium mb-2">File Requirements</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Maximum file size: 10MB</li>
-                  <li>• Supported formats: PDF, DOCX, XLSX, PPTX, JPG, PNG</li>
-                  <li>• Use descriptive file names</li>
-                </ul>
+        {/* Upload Tips & Categories Info */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Upload Requirements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">File Requirements</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Maximum file size: {settings?.maxFileSize || 10}MB</li>
+                    <li>• Supported formats: {allowedFileTypes.join(', ').toUpperCase()}</li>
+                    <li>• Use descriptive file names</li>
+                    <li>• Ensure files are not corrupted</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Organization Tips</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Choose the most appropriate category</li>
+                    <li>• Add detailed descriptions for better searchability</li>
+                    <li>• Consider sharing useful documents with colleagues</li>
+                  </ul>
+                </div>
               </div>
-              <div>
-                <h4 className="font-medium mb-2">Organization Tips</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Choose the most appropriate category</li>
-                  <li>• Include class and subject for lesson materials</li>
-                  <li>• Add descriptions for better searchability</li>
-                </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Document Categories</CardTitle>
+              <CardDescription>
+                Understanding category requirements
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {categoriesLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading categories...</p>
+                ) : (
+                  categories.map((category) => (
+                    <div key={category.id} className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-sm">{category.name}</h4>
+                          {category.requires_class_subject && (
+                            <Badge variant="outline" className="text-xs">
+                              Requires Class & Subject
+                            </Badge>
+                          )}
+                        </div>
+                        {category.description && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {category.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );

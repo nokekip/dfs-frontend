@@ -1221,72 +1221,76 @@ export class ApiClient {
   }
 
   async createDocument(data: DocumentCreateRequest): Promise<ApiResponse<Document>> {
-    await delay();
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('Authentication required', 401);
+      }
 
-    const user = this.getCurrentUser();
-    if (user.role !== 'teacher') {
-      simulateError('Only teachers can upload documents', 403);
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('file', data.file);
+      formData.append('category', data.categoryId);
+      
+      if (data.description) {
+        formData.append('description', data.description);
+      }
+      
+      if (data.classLevel) {
+        formData.append('class_level', data.classLevel);
+      }
+      
+      if (data.subject) {
+        formData.append('subject', data.subject);
+      }
+      
+      if (data.tags && data.tags.length > 0) {
+        formData.append('tags', data.tags.join(','));
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData, let browser set it
+        },
+        body: formData,
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = responseData.detail || 
+                            responseData.error || 
+                            responseData.message ||
+                            'Failed to create document';
+        throw new ApiError(errorMessage, response.status);
+      }
+
+      return {
+        success: true,
+        data: responseData,
+        message: 'Document uploaded successfully',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred during document upload', 500);
     }
-
-    const teachers = mockDataStore.getTeachers();
-    const teacher = teachers.find(t => t.user.id === user.id);
-    if (!teacher) {
-      simulateError('Teacher profile not found', 404);
-    }
-
-    const categories = mockDataStore.getCategories();
-    const category = categories.find(c => c.id === data.categoryId);
-    if (!category) {
-      simulateError('Category not found', 404);
-    }
-
-    // Validate required fields for category
-    if (category.requiresClassSubject && (!data.classLevel || !data.subject)) {
-      simulateError('Class level and subject are required for this category', 400);
-    }
-
-    const newDocument: Document = {
-      id: mockDataStore.generateId(),
-      title: data.title,
-      description: data.description,
-      category,
-      teacher,
-      fileName: data.file.name,
-      fileSize: data.file.size,
-      fileType: data.file.type,
-      filePath: `/uploads/documents/${data.file.name}`,
-      classLevel: data.classLevel,
-      subject: data.subject,
-      isShared: false,
-      sharedWith: [], // Initialize as empty array
-      downloadCount: 0,
-      status: 'published',
-      tags: data.tags || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const documents = mockDataStore.getDocuments();
-    documents.push(newDocument);
-    mockDataStore.saveDocuments(documents);
-
-    // Update teacher document count
-    teacher.documentsCount += 1;
-    teacher.updatedAt = new Date().toISOString();
-    const updatedTeachers = teachers.map(t => t.id === teacher.id ? teacher : t);
-    mockDataStore.saveTeachers(updatedTeachers);
-
-    // Update category document count
-    category.documentsCount += 1;
-    category.updatedAt = new Date().toISOString();
-    const updatedCategories = categories.map(c => c.id === category.id ? category : c);
-    mockDataStore.saveCategories(updatedCategories);
-
-    return {
-      success: true,
-      data: newDocument,
-      message: 'Document uploaded successfully',
-    };
   }
 
   async shareDocument(documentId: string, data: DocumentShareRequest): Promise<ApiResponse<Document>> {
@@ -1533,7 +1537,7 @@ export class ApiClient {
 
   // Category Methods
   async getCategories(): Promise<ApiResponse<DocumentCategory[]>> {
-    this.requireRole('admin');
+    this.getCurrentUser(); // Just ensure user is authenticated
     
     try {
       const token = localStorage.getItem(config.auth.tokenKey);
@@ -1557,7 +1561,7 @@ export class ApiClient {
       
       // Convert backend response to frontend DocumentCategory interface
       const categories: DocumentCategory[] = data.map((category: any) => ({
-        id: category.id,
+        id: category.id.toString(), // Convert to string to match form state
         name: category.name,
         description: category.description,
         requiresClassSubject: category.requires_class_subject,
@@ -2160,6 +2164,40 @@ export class ApiClient {
     };
 
     return severityMapping[upperSeverity] || 'LOW';
+  }
+
+  // System Settings Methods
+  async getPublicSettings(): Promise<ApiResponse<any>> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/settings/public/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data.data,
+        message: 'Public settings retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch public settings', 500);
+    }
   }
 }
 
