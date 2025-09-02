@@ -644,11 +644,11 @@ export default function AdminTeachers() {
             {selectedTeacher && (
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                      {selectedTeacher.user.firstName?.[0]}{selectedTeacher.user.lastName?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar 
+                    user={selectedTeacher.user} 
+                    size="xl" 
+                    fallbackClassName="bg-primary/10 text-primary text-lg"
+                  />
                   <div>
                     <h3 className="text-lg font-semibold">
                       {selectedTeacher.user.firstName} {selectedTeacher.user.lastName}

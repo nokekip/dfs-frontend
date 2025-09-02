@@ -651,218 +651,402 @@ export class ApiClient {
 
   // Teacher Methods
   async getTeachers(): Promise<ApiResponse<Teacher[]>> {
-    await delay();
-    
     this.requireRole('admin');
-    const teachers = mockDataStore.getTeachers();
     
-    return {
-      success: true,
-      data: teachers,
-      message: 'Teachers retrieved successfully',
-    };
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/accounts/teachers/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      
+      // Convert backend response to frontend Teacher interface
+      const teachers: Teacher[] = data.map((teacher: any) => ({
+        id: teacher.id,
+        user: {
+          id: teacher.user.id,
+          email: teacher.user.email,
+          firstName: teacher.user.first_name,
+          lastName: teacher.user.last_name,
+          
+          role: teacher.user.role,
+          phoneNumber: teacher.user.phone_number,
+          bio: teacher.user.bio,
+          profilePicture: teacher.user.profile_picture,
+          isActive: teacher.user.is_active,
+          dateJoined: teacher.user.date_joined,
+          lastLogin: teacher.user.last_login,
+        },
+        phoneNumber: teacher.user.phone_number,
+        bio: teacher.user.bio,
+        status: teacher.status,
+        approvedBy: teacher.approved_by,
+        approvedAt: teacher.approved_at,
+        rejectedBy: teacher.rejected_by,
+        rejectedAt: teacher.rejected_at,
+        rejectionReason: teacher.rejection_reason,
+        documentsCount: teacher.documents_count || 0,
+        sharedDocumentsCount: teacher.shared_documents_count || 0,
+        totalDownloads: teacher.total_downloads || 0,
+        createdAt: teacher.created_at,
+        updatedAt: teacher.updated_at,
+      }));
+
+      return {
+        success: true,
+        data: teachers,
+        message: 'Teachers retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch teachers', 500);
+    }
   }
 
   async approveTeacher(teacherId: string, data: TeacherApprovalRequest): Promise<ApiResponse<Teacher>> {
-    await delay();
-
-    const adminUser = this.requireRole('admin');
-    const teachers = mockDataStore.getTeachers();
-    const teacherIndex = teachers.findIndex(t => t.id === teacherId);
-
-    if (teacherIndex === -1) {
-      simulateError('Teacher not found', 404);
-    }
-
-    const teacher = teachers[teacherIndex];
+    this.requireRole('admin');
     
-    if (data.approved) {
-      teacher.status = 'active';
-      teacher.approvedBy = adminUser.id;
-      teacher.approvedAt = new Date().toISOString();
-      teacher.rejectionReason = undefined;
-      teacher.rejectedBy = undefined;
-      teacher.rejectedAt = undefined;
-    } else {
-      teacher.status = 'rejected';
-      teacher.rejectedBy = adminUser.id;
-      teacher.rejectedAt = new Date().toISOString();
-      teacher.rejectionReason = data.rejectionReason;
-      teacher.approvedBy = undefined;
-      teacher.approvedAt = undefined;
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const endpoint = data.approved ? 'approve' : 'reject';
+      const url = `${config.api.baseUrl}/accounts/teachers/${teacherId}/${endpoint}/`;
+
+      const requestBody = data.approved ? {} : { rejection_reason: data.rejectionReason };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new ApiError(errorData.error || `Failed to ${data.approved ? 'approve' : 'reject'} teacher`, response.status);
+      }
+
+      const responseData = await response.json();
+      const teacher = responseData.teacher;
+      
+      // Convert backend response to frontend Teacher interface
+      const convertedTeacher: Teacher = {
+        id: teacher.id,
+        user: {
+          id: teacher.user.id,
+          email: teacher.user.email,
+          firstName: teacher.user.first_name,
+          lastName: teacher.user.last_name,
+          
+          role: teacher.user.role,
+          phoneNumber: teacher.user.phone_number,
+          bio: teacher.user.bio,
+          profilePicture: teacher.user.profile_picture,
+          isActive: teacher.user.is_active,
+          dateJoined: teacher.user.date_joined,
+          lastLogin: teacher.user.last_login,
+        },
+        phoneNumber: teacher.user.phone_number,
+        bio: teacher.user.bio,
+        status: teacher.status,
+        approvedBy: teacher.approved_by,
+        approvedAt: teacher.approved_at,
+        rejectedBy: teacher.rejected_by,
+        rejectedAt: teacher.rejected_at,
+        rejectionReason: teacher.rejection_reason,
+        documentsCount: teacher.documents_count || 0,
+        sharedDocumentsCount: teacher.shared_documents_count || 0,
+        totalDownloads: teacher.total_downloads || 0,
+        createdAt: teacher.created_at,
+        updatedAt: teacher.updated_at,
+      };
+
+      return {
+        success: true,
+        data: convertedTeacher,
+        message: responseData.message,
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError(`Failed to ${data.approved ? 'approve' : 'reject'} teacher`, 500);
     }
-    
-    teacher.updatedAt = new Date().toISOString();
-    teachers[teacherIndex] = teacher;
-    mockDataStore.saveTeachers(teachers);
-
-    // Log activity
-    mockDataStore.addActivityLog({
-      user: adminUser,
-      action: data.approved ? 'approve' : 'reject',
-      targetType: 'teacher',
-      targetId: teacher.id,
-      targetName: `${teacher.user.firstName} ${teacher.user.lastName}`,
-      description: `${data.approved ? 'approved' : 'rejected'} teacher account for ${teacher.user.firstName} ${teacher.user.lastName}`,
-    });
-
-    return {
-      success: true,
-      data: teacher,
-      message: `Teacher ${data.approved ? 'approved' : 'rejected'} successfully`,
-    };
   }
 
   async createTeacher(data: TeacherCreateRequest): Promise<ApiResponse<Teacher>> {
-    await delay();
+    this.requireRole('admin');
+    
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    const adminUser = this.requireRole('admin');
-    const users = mockDataStore.getUsers();
+      // Convert frontend request to backend format
+      const requestData = {
+        email: data.user.email,
+        first_name: data.user.firstName,
+        last_name: data.user.lastName,
+        password: data.user.password,
+        phone_number: data.phoneNumber || '',
+        bio: data.bio || '',
+      };
 
-    // Check if email already exists
-    if (users.some(u => u.email === data.user.email)) {
-      simulateError('Email already registered', 400);
+      const response = await fetch(`${config.api.baseUrl}/accounts/teachers/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Handle validation errors
+        if (response.status === 400) {
+          const errorMessage = Object.entries(errorData)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join('; ');
+          throw new ApiError(errorMessage, 400);
+        }
+        
+        throw new ApiError('Failed to create teacher', response.status);
+      }
+
+      const teacher = await response.json();
+      
+      // Convert backend response to frontend Teacher interface
+      const convertedTeacher: Teacher = {
+        id: teacher.id,
+        user: {
+          id: teacher.user.id,
+          email: teacher.user.email,
+          firstName: teacher.user.first_name,
+          lastName: teacher.user.last_name,
+          
+          role: teacher.user.role,
+          phoneNumber: teacher.user.phone_number,
+          bio: teacher.user.bio,
+          profilePicture: teacher.user.profile_picture,
+          isActive: teacher.user.is_active,
+          dateJoined: teacher.user.date_joined,
+          lastLogin: teacher.user.last_login,
+        },
+        phoneNumber: teacher.user.phone_number,
+        bio: teacher.user.bio,
+        status: teacher.status,
+        approvedBy: teacher.approved_by,
+        approvedAt: teacher.approved_at,
+        rejectedBy: teacher.rejected_by,
+        rejectedAt: teacher.rejected_at,
+        rejectionReason: teacher.rejection_reason,
+        documentsCount: teacher.documents_count || 0,
+        sharedDocumentsCount: teacher.shared_documents_count || 0,
+        totalDownloads: teacher.total_downloads || 0,
+        createdAt: teacher.created_at,
+        updatedAt: teacher.updated_at,
+      };
+
+      return {
+        success: true,
+        data: convertedTeacher,
+        message: 'Teacher created successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to create teacher', 500);
     }
-
-    const newUser: User = {
-      id: mockDataStore.generateId(),
-      email: data.user.email,
-      firstName: data.user.firstName,
-      lastName: data.user.lastName,
-      role: 'teacher',
-      isActive: true, // Admin-created teachers are active by default
-      dateJoined: new Date().toISOString(),
-    };
-
-    // Create teacher profile
-    const newTeacher: Teacher = {
-      id: mockDataStore.generateId(),
-      user: newUser,
-      status: 'active',
-      phoneNumber: data.phoneNumber,
-      documentsCount: 0,
-      sharedDocumentsCount: 0,
-      totalDownloads: 0,
-      approvedBy: adminUser.id,
-      approvedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    const teachers = mockDataStore.getTeachers();
-    teachers.push(newTeacher);
-
-    mockDataStore.saveUsers(users);
-    mockDataStore.saveTeachers(teachers);
-
-    // Log activity
-    mockDataStore.addActivityLog({
-      user: adminUser,
-      action: 'create',
-      targetType: 'teacher',
-      targetId: newTeacher.id,
-      targetName: `${newTeacher.user.firstName} ${newTeacher.user.lastName}`,
-      description: `created teacher account for ${newTeacher.user.firstName} ${newTeacher.user.lastName}`,
-    });
-
-    return {
-      success: true,
-      data: newTeacher,
-      message: 'Teacher created successfully',
-    };
   }
 
   async updateTeacher(teacherId: string, data: TeacherUpdateRequest): Promise<ApiResponse<Teacher>> {
-    await delay();
-
-    const adminUser = this.requireRole('admin');
-    const teachers = mockDataStore.getTeachers();
-    const teacherIndex = teachers.findIndex(t => t.id === teacherId);
-
-    if (teacherIndex === -1) {
-      simulateError('Teacher not found', 404);
-    }
-
-    const teacher = teachers[teacherIndex];
+    this.requireRole('admin');
     
-    // Update the teacher properties
-    if (data.phoneNumber !== undefined) {
-      teacher.phoneNumber = data.phoneNumber;
-    }
-    if (data.bio !== undefined) {
-      teacher.bio = data.bio;
-    }
-    if (data.status !== undefined) {
-      teacher.status = data.status;
-    }
-    
-    teacher.updatedAt = new Date().toISOString();
-    teachers[teacherIndex] = teacher;
-    mockDataStore.saveTeachers(teachers);
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    // Log activity
-    mockDataStore.addActivityLog({
-      user: adminUser,
-      action: 'update',
-      targetType: 'teacher',
-      targetId: teacher.id,
-      targetName: `${teacher.user.firstName} ${teacher.user.lastName}`,
-      description: `updated teacher account for ${teacher.user.firstName} ${teacher.user.lastName}`,
-    });
+      // For status changes, use the suspend endpoint
+      if (data.status !== undefined) {
+        const response = await fetch(`${config.api.baseUrl}/accounts/teachers/${teacherId}/suspend/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-    return {
-      success: true,
-      data: teacher,
-      message: 'Teacher updated successfully',
-    };
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new ApiError(errorData.error || 'Failed to update teacher status', response.status);
+        }
+
+        const responseData = await response.json();
+        const teacher = responseData.teacher;
+        
+        // Convert backend response to frontend Teacher interface
+        const convertedTeacher: Teacher = {
+          id: teacher.id,
+          user: {
+            id: teacher.user.id,
+            email: teacher.user.email,
+            firstName: teacher.user.first_name,
+            lastName: teacher.user.last_name,
+            role: teacher.user.role,
+            phoneNumber: teacher.user.phone_number,
+            bio: teacher.user.bio,
+            profilePicture: teacher.user.profile_picture,
+            isActive: teacher.user.is_active,
+            dateJoined: teacher.user.date_joined,
+            lastLogin: teacher.user.last_login,
+          },
+          phoneNumber: teacher.user.phone_number,
+          bio: teacher.user.bio,
+          status: teacher.status,
+          approvedBy: teacher.approved_by,
+          approvedAt: teacher.approved_at,
+          rejectedBy: teacher.rejected_by,
+          rejectedAt: teacher.rejected_at,
+          rejectionReason: teacher.rejection_reason,
+          documentsCount: teacher.documents_count || 0,
+          sharedDocumentsCount: teacher.shared_documents_count || 0,
+          totalDownloads: teacher.total_downloads || 0,
+          createdAt: teacher.created_at,
+          updatedAt: teacher.updated_at,
+        };
+
+        return {
+          success: true,
+          data: convertedTeacher,
+          message: responseData.message,
+        };
+      }
+
+      // For other updates, use the regular PATCH endpoint
+      const requestData: any = {};
+      if (data.phoneNumber !== undefined) requestData.phone_number = data.phoneNumber;
+      if (data.bio !== undefined) requestData.bio = data.bio;
+
+      const response = await fetch(`${config.api.baseUrl}/accounts/teachers/${teacherId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        throw new ApiError('Failed to update teacher', response.status);
+      }
+
+      const teacher = await response.json();
+      
+      // Convert backend response to frontend Teacher interface
+      const convertedTeacher: Teacher = {
+        id: teacher.id,
+        user: {
+          id: teacher.user.id,
+          email: teacher.user.email,
+          firstName: teacher.user.first_name,
+          lastName: teacher.user.last_name,
+          
+          role: teacher.user.role,
+          phoneNumber: teacher.user.phone_number,
+          bio: teacher.user.bio,
+          profilePicture: teacher.user.profile_picture,
+          isActive: teacher.user.is_active,
+          dateJoined: teacher.user.date_joined,
+          lastLogin: teacher.user.last_login,
+        },
+        phoneNumber: teacher.user.phone_number,
+        bio: teacher.user.bio,
+        status: teacher.status,
+        approvedBy: teacher.approved_by,
+        approvedAt: teacher.approved_at,
+        rejectedBy: teacher.rejected_by,
+        rejectedAt: teacher.rejected_at,
+        rejectionReason: teacher.rejection_reason,
+        documentsCount: teacher.documents_count || 0,
+        sharedDocumentsCount: teacher.shared_documents_count || 0,
+        totalDownloads: teacher.total_downloads || 0,
+        createdAt: teacher.created_at,
+        updatedAt: teacher.updated_at,
+      };
+
+      return {
+        success: true,
+        data: convertedTeacher,
+        message: 'Teacher updated successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to update teacher', 500);
+    }
   }
 
   async deleteTeacher(teacherId: string): Promise<ApiResponse<void>> {
-    await delay();
-
-    const adminUser = this.requireRole('admin');
-    const teachers = mockDataStore.getTeachers();
-    const teacherIndex = teachers.findIndex(t => t.id === teacherId);
-
-    if (teacherIndex === -1) {
-      simulateError('Teacher not found', 404);
-    }
-
-    const teacher = teachers[teacherIndex];
+    this.requireRole('admin');
     
-    // Remove teacher from teachers array
-    teachers.splice(teacherIndex, 1);
-    mockDataStore.saveTeachers(teachers);
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    // Also remove the associated user
-    const users = mockDataStore.getUsers();
-    const userIndex = users.findIndex(u => u.id === teacher.user.id);
-    if (userIndex !== -1) {
-      users.splice(userIndex, 1);
-      mockDataStore.saveUsers(users);
+      const response = await fetch(`${config.api.baseUrl}/accounts/teachers/${teacherId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new ApiError('Teacher not found', 404);
+        }
+        throw new ApiError('Failed to delete teacher', response.status);
+      }
+
+      return {
+        success: true,
+        message: 'Teacher deleted successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to delete teacher', 500);
     }
-
-    // Remove all documents uploaded by this teacher
-    const documents = mockDataStore.getDocuments();
-    const updatedDocuments = documents.filter(doc => doc.teacher.id !== teacherId);
-    mockDataStore.saveDocuments(updatedDocuments);
-
-    // Log activity
-    mockDataStore.addActivityLog({
-      user: adminUser,
-      action: 'delete',
-      targetType: 'teacher',
-      targetId: teacher.id,
-      targetName: `${teacher.user.firstName} ${teacher.user.lastName}`,
-      description: `deleted teacher account for ${teacher.user.firstName} ${teacher.user.lastName}`,
-    });
-
-    return {
-      success: true,
-      data: undefined,
-      message: 'Teacher deleted successfully',
-    };
   }
 
   // Document Methods
