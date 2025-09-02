@@ -7,6 +7,8 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
+import { apiClient } from '../services/api';
+import { ActivityLog } from '../services/types';
 import { 
   Search, 
   Filter, 
@@ -26,20 +28,6 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-interface ActivityLog {
-  id: string;
-  userId: string;
-  userName: string;
-  userRole: 'teacher' | 'admin';
-  action: 'login' | 'logout' | 'upload' | 'download' | 'share' | 'delete' | 'approve' | 'reject' | 'suspend' | 'settings_change';
-  target?: string;
-  targetType?: 'document' | 'user' | 'category' | 'system';
-  ipAddress: string;
-  timestamp: string;
-  details?: string;
-  severity: 'low' | 'medium' | 'high';
-}
-
 export default function AdminActivity() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [filteredActivities, setFilteredActivities] = useState<ActivityLog[]>([]);
@@ -48,19 +36,52 @@ export default function AdminActivity() {
   const [userFilter, setUserFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [dateRange, setDateRange] = useState('7');
+  const [loading, setLoading] = useState(true);
+
+  // Load activity logs from API
+  useEffect(() => {
+    const loadActivities = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.getActivityLogs();
+        
+        // Ensure we have valid data and filter out any potential invalid entries
+        const validActivities = (response.data || []).filter(activity => 
+          activity && 
+          activity.id && 
+          activity.user && 
+          activity.user.id && 
+          activity.user.id.trim() !== ''
+        );
+        
+        setActivities(validActivities);
+        setFilteredActivities(validActivities);
+      } catch (error) {
+        console.error('Failed to load activity logs:', error);
+        toast.error('Failed to load activity logs');
+        // Set empty arrays in case of error to prevent undefined issues
+        setActivities([]);
+        setFilteredActivities([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadActivities();
+  }, []);
 
   const handleExportLogs = () => {
     // Generate and download activity logs CSV
     const csvHeaders = ['Timestamp', 'User', 'Role', 'Action', 'Target', 'IP Address', 'Severity', 'Details'];
     const csvRows = filteredActivities.map(activity => [
-      new Date(activity.timestamp).toLocaleString(),
-      activity.userName,
-      activity.userRole,
-      activity.action,
-      activity.target,
-      activity.ipAddress,
-      activity.severity,
-      activity.details.replace(/,/g, ';') // Replace commas to avoid CSV issues
+      new Date(activity.createdAt).toLocaleString(),
+      `${activity.user?.firstName || ''} ${activity.user?.lastName || ''}`.trim(),
+      activity.user?.role || 'unknown',
+      activity.action || '',
+      activity.targetName || activity.targetType || '',
+      activity.ipAddress || '',
+      activity.severity || 'LOW',
+      (activity.description || '').replace(/,/g, ';') // Replace commas to avoid CSV issues
     ]);
 
     const csvContent = [csvHeaders, ...csvRows]
@@ -82,126 +103,25 @@ export default function AdminActivity() {
     });
   };
 
-  // Mock data - in real app, this would come from Django REST API
-  useEffect(() => {
-    const mockActivities: ActivityLog[] = [
-      {
-        id: '1',
-        userId: 'admin1',
-        userName: 'Admin User',
-        userRole: 'admin',
-        action: 'approve',
-        target: 'Mary Ochieng',
-        targetType: 'user',
-        ipAddress: '192.168.1.10',
-        timestamp: '2024-01-20T10:30:00Z',
-        details: 'Approved teacher account registration',
-        severity: 'medium'
-      },
-      {
-        id: '2',
-        userId: 'teacher1',
-        userName: 'Jane Mwangi',
-        userRole: 'teacher',
-        action: 'upload',
-        target: 'Mathematics Lesson Plan - Week 5',
-        targetType: 'document',
-        ipAddress: '192.168.1.15',
-        timestamp: '2024-01-20T09:15:00Z',
-        details: 'Uploaded new lesson plan document',
-        severity: 'low'
-      },
-      {
-        id: '3',
-        userId: 'teacher2',
-        userName: 'John Kiprotich',
-        userRole: 'teacher',
-        action: 'share',
-        target: 'Science Assessment Template',
-        targetType: 'document',
-        ipAddress: '192.168.1.22',
-        timestamp: '2024-01-20T08:45:00Z',
-        details: 'Shared document with 3 colleagues',
-        severity: 'low'
-      },
-      {
-        id: '4',
-        userId: 'admin1',
-        userName: 'Admin User',
-        userRole: 'admin',
-        action: 'suspend',
-        target: 'David Mwema',
-        targetType: 'user',
-        ipAddress: '192.168.1.10',
-        timestamp: '2024-01-19T16:20:00Z',
-        details: 'Suspended teacher account for policy violation',
-        severity: 'high'
-      },
-      {
-        id: '5',
-        userId: 'teacher3',
-        userName: 'Mary Ochieng',
-        userRole: 'teacher',
-        action: 'login',
-        ipAddress: '192.168.1.33',
-        timestamp: '2024-01-19T14:30:00Z',
-        details: 'Successful login via 2FA',
-        severity: 'low'
-      },
-      {
-        id: '6',
-        userId: 'teacher1',
-        userName: 'Jane Mwangi',
-        userRole: 'teacher',
-        action: 'delete',
-        target: 'Old Lesson Plan Draft',
-        targetType: 'document',
-        ipAddress: '192.168.1.15',
-        timestamp: '2024-01-19T12:15:00Z',
-        details: 'Deleted draft document',
-        severity: 'medium'
-      },
-      {
-        id: '7',
-        userId: 'admin1',
-        userName: 'Admin User',
-        userRole: 'admin',
-        action: 'settings_change',
-        target: 'Category: Lesson Plans',
-        targetType: 'category',
-        ipAddress: '192.168.1.10',
-        timestamp: '2024-01-19T11:00:00Z',
-        details: 'Modified category requirements',
-        severity: 'medium'
-      },
-      {
-        id: '8',
-        userId: 'teacher4',
-        userName: 'David Mwema',
-        userRole: 'teacher',
-        action: 'download',
-        target: 'Mathematics Assessment Template',
-        targetType: 'document',
-        ipAddress: '192.168.1.44',
-        timestamp: '2024-01-19T10:30:00Z',
-        details: 'Downloaded shared document',
-        severity: 'low'
-      }
-    ];
-    setActivities(mockActivities);
-    setFilteredActivities(mockActivities);
-  }, []);
-
   // Filter activities
   useEffect(() => {
+    if (!activities || activities.length === 0) {
+      setFilteredActivities([]);
+      return;
+    }
+
     let filtered = activities.filter(activity => {
-      const matchesSearch = activity.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           activity.target?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           activity.details?.toLowerCase().includes(searchQuery.toLowerCase());
+      // Ensure activity and user data is valid
+      if (!activity || !activity.user || !activity.user.id) return false;
+      
+      const fullUserName = `${activity.user.firstName || ''} ${activity.user.lastName || ''}`.trim();
+      const matchesSearch = fullUserName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           activity.targetName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           activity.description?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesAction = actionFilter === 'all' || activity.action === actionFilter;
-      const matchesUser = userFilter === 'all' || activity.userId === userFilter;
-      const matchesSeverity = severityFilter === 'all' || activity.severity === severityFilter;
+      const matchesUser = userFilter === 'all' || activity.user.id === userFilter;
+      const matchesSeverity = severityFilter === 'all' || activity.severity?.toLowerCase() === severityFilter;
 
       return matchesSearch && matchesAction && matchesUser && matchesSeverity;
     });
@@ -214,6 +134,7 @@ export default function AdminActivity() {
       case 'login':
       case 'logout':
         return <User className="h-4 w-4" />;
+      case 'create':
       case 'upload':
         return <Upload className="h-4 w-4" />;
       case 'download':
@@ -225,10 +146,13 @@ export default function AdminActivity() {
       case 'approve':
       case 'reject':
         return <UserCheck className="h-4 w-4" />;
-      case 'suspend':
+      case 'flag':
+      case 'archive':
         return <Shield className="h-4 w-4" />;
-      case 'settings_change':
+      case 'update':
         return <Settings className="h-4 w-4" />;
+      case 'view':
+        return <Eye className="h-4 w-4" />;
       default:
         return <Activity className="h-4 w-4" />;
     }
@@ -236,17 +160,20 @@ export default function AdminActivity() {
 
   const getActionColor = (action: string) => {
     switch (action) {
+      case 'create':
       case 'upload':
       case 'approve':
         return 'text-success';
       case 'delete':
       case 'reject':
-      case 'suspend':
+      case 'flag':
         return 'text-destructive';
       case 'share':
       case 'download':
+      case 'view':
         return 'text-info';
-      case 'settings_change':
+      case 'update':
+      case 'archive':
         return 'text-warning';
       default:
         return 'text-muted-foreground';
@@ -254,8 +181,10 @@ export default function AdminActivity() {
   };
 
   const getSeverityBadge = (severity: string) => {
-    switch (severity) {
+    const normalizedSeverity = severity.toLowerCase();
+    switch (normalizedSeverity) {
       case 'high':
+      case 'critical':
         return <Badge variant="destructive">High</Badge>;
       case 'medium':
         return <Badge className="bg-warning/10 text-warning border-warning/20">Medium</Badge>;
@@ -277,15 +206,23 @@ export default function AdminActivity() {
   };
 
   const formatActionText = (activity: ActivityLog) => {
-    const baseAction = activity.action.replace('_', ' ');
-    if (activity.target) {
-      return `${baseAction} "${activity.target}"`;
+    const baseAction = (activity.action || '').replace('_', ' ');
+    if (activity.targetName) {
+      return `${baseAction} "${activity.targetName}"`;
     }
     return baseAction;
   };
 
-  const users = Array.from(new Set(activities.map(a => a.userName)));
-  const actions = Array.from(new Set(activities.map(a => a.action)));
+  const users = Array.from(new Set(
+    activities
+      .filter(a => a && a.user && a.user.firstName && a.user.lastName)
+      .map(a => `${a.user.firstName} ${a.user.lastName}`)
+  ));
+  const actions = Array.from(new Set(
+    activities
+      .map(a => a?.action)
+      .filter(action => action && action.trim() !== '')
+  ));
 
   return (
     <Layout>
@@ -320,40 +257,48 @@ export default function AdminActivity() {
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{activities.length}</div>
-              <p className="text-xs text-muted-foreground">Total Activities</p>
+            <CardContent className="p-6">
+              <div className="flex flex-col space-y-2">
+                <div className="text-2xl font-bold">{activities.length}</div>
+                <p className="text-xs text-muted-foreground">Total Activities</p>
+              </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-success">
-                {activities.filter(a => a.severity === 'low').length}
+            <CardContent className="p-6">
+              <div className="flex flex-col space-y-2">
+                <div className="text-2xl font-bold text-success">
+                  {activities.filter(a => a.severity.toLowerCase() === 'low').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Low Severity</p>
               </div>
-              <p className="text-xs text-muted-foreground">Low Severity</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-warning">
-                {activities.filter(a => a.severity === 'medium').length}
+            <CardContent className="p-6">
+              <div className="flex flex-col space-y-2">
+                <div className="text-2xl font-bold text-warning">
+                  {activities.filter(a => a.severity.toLowerCase() === 'medium').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Medium Severity</p>
               </div>
-              <p className="text-xs text-muted-foreground">Medium Severity</p>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-destructive">
-                {activities.filter(a => a.severity === 'high').length}
+            <CardContent className="p-6">
+              <div className="flex flex-col space-y-2">
+                <div className="text-2xl font-bold text-destructive">
+                  {activities.filter(a => ['high', 'critical'].includes(a.severity.toLowerCase())).length}
+                </div>
+                <p className="text-xs text-muted-foreground">High Severity</p>
               </div>
-              <p className="text-xs text-muted-foreground">High Severity</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -371,11 +316,13 @@ export default function AdminActivity() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Actions</SelectItem>
-                    {actions.map(action => (
-                      <SelectItem key={action} value={action}>
-                        {action.replace('_', ' ')}
-                      </SelectItem>
-                    ))}
+                    {actions
+                      .filter(action => action && action.trim() !== '') // Filter out empty actions
+                      .map(action => (
+                        <SelectItem key={action} value={action}>
+                          {action.replace('_', ' ')}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
 
@@ -397,9 +344,19 @@ export default function AdminActivity() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Users</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user} value={user}>{user}</SelectItem>
-                    ))}
+                    {Array.from(new Set(
+                      activities
+                        .filter(a => a && a.user && a.user.id && a.user.id.trim() !== '')
+                        .map(a => a.user.id)
+                    )).map(userId => {
+                      const activity = activities.find(a => a.user.id === userId);
+                      const userName = activity && activity.user.firstName && activity.user.lastName 
+                        ? `${activity.user.firstName} ${activity.user.lastName}` 
+                        : userId;
+                      return (
+                        <SelectItem key={userId} value={userId}>{userName}</SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -415,63 +372,83 @@ export default function AdminActivity() {
               Chronological list of system activities
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {filteredActivities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-shrink-0">
-                    <div className={`p-2 rounded-full bg-muted ${getActionColor(activity.action)}`}>
-                      {getActionIcon(activity.action)}
-                    </div>
+          <CardContent className="p-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredActivities.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No activities found matching your filters.
                   </div>
-                  
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <UserAvatar 
-                          user={{ 
-                            firstName: activity.userName.split(' ')[0], 
-                            lastName: activity.userName.split(' ')[1] || '',
-                            id: '', email: '', role: 'teacher'
-                          }} 
-                          size="sm" 
-                        />
-                        <span className="font-medium">{activity.userName}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {activity.userRole}
-                        </Badge>
-                      </div>
-                      {getSeverityBadge(activity.severity)}
-                    </div>
-                    
-                    <p className="text-sm">
-                      <span className="font-medium">{formatActionText(activity)}</span>
-                      {activity.details && (
-                        <span className="text-muted-foreground"> - {activity.details}</span>
-                      )}
-                    </p>
-                    
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatDateTime(activity.timestamp)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span>IP: {activity.ipAddress}</span>
-                      </div>
-                      {activity.targetType && (
-                        <div className="flex items-center gap-1">
-                          <span>Target: {activity.targetType}</span>
+                ) : (
+                  filteredActivities.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors w-full"
+                    >
+                      <div className="flex-shrink-0">
+                        <div className={`p-2 rounded-full bg-muted ${getActionColor(activity.action || '')}`}>
+                          {getActionIcon(activity.action || '')}
                         </div>
-                      )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <UserAvatar 
+                              user={{ 
+                                firstName: activity.user?.firstName || '', 
+                                lastName: activity.user?.lastName || '',
+                                id: activity.user?.id || '', 
+                                email: activity.user?.email || '', 
+                                role: activity.user?.role || 'teacher',
+                                isActive: activity.user?.isActive ?? true,
+                                dateJoined: activity.user?.dateJoined || ''
+                              }} 
+                              size="sm" 
+                            />
+                            <span className="font-medium">
+                              {activity.user?.firstName || ''} {activity.user?.lastName || ''}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {activity.user?.role || 'unknown'}
+                            </Badge>
+                          </div>
+                          {getSeverityBadge(activity.severity || 'LOW')}
+                        </div>
+                        
+                        <p className="text-sm">
+                          <span className="font-medium">{formatActionText(activity)}</span>
+                          {activity.description && (
+                            <span className="text-muted-foreground"> - {activity.description}</span>
+                          )}
+                        </p>
+                        
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatDateTime(activity.createdAt)}</span>
+                          </div>
+                          {activity.ipAddress && (
+                            <div className="flex items-center gap-1">
+                              <span>IP: {activity.ipAddress}</span>
+                            </div>
+                          )}
+                          {activity.targetType && (
+                            <div className="flex items-center gap-1">
+                              <span>Target: {activity.targetType}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

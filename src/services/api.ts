@@ -30,6 +30,7 @@ import {
   SystemSettings,
   SecuritySettings,
   ActivityLog,
+  ActivityAction,
   PaginatedResponse,
   SearchFilters,
   SearchResults,
@@ -104,6 +105,62 @@ export class ApiClient {
     return user;
   }
 
+  private async makeRequest<T>(url: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new ApiError('Authentication required', 401);
+      }
+
+      const defaultHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...defaultHeaders,
+          ...options.headers,
+        },
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, clear auth state
+          localStorage.removeItem(config.auth.tokenKey);
+          localStorage.removeItem(config.auth.refreshTokenKey);
+          localStorage.removeItem(config.auth.userKey);
+        }
+        const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new ApiError(errorData.error || `HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data,
+        message: 'Request successful',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred', 500);
+    }
+  }
+
   // Authentication Methods
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     try {
@@ -133,7 +190,7 @@ export class ApiClient {
           success: true,
           data: {
             user: {
-              id: data.user_id,
+              id: data.user_id.toString(), // Convert to string to match interface
               email: data.email,
               firstName: data.first_name,
               lastName: data.last_name,
@@ -152,7 +209,7 @@ export class ApiClient {
       // If no OTP required (shouldn't happen with current backend, but handling it)
       if (data.access && data.refresh) {
         const user: User = {
-          id: data.user.id,
+          id: data.user.id.toString(), // Convert to string to match interface
           email: data.user.email,
           firstName: data.user.first_name,
           lastName: data.user.last_name,
@@ -244,13 +301,6 @@ export class ApiClient {
     mockDataStore.saveUsers(users);
     mockDataStore.saveTeachers(teachers);
 
-    // Log activity
-    mockDataStore.addActivityLog({
-      user: newUser,
-      action: 'register',
-      description: 'registered for an account',
-    });
-
     return {
       success: true,
       data: { message: 'Registration successful. Please verify your email with the OTP sent to your inbox.' },
@@ -280,7 +330,7 @@ export class ApiClient {
 
       // Success - create user and tokens from response
       const user: User = {
-        id: responseData.user.id,
+        id: responseData.user.id.toString(), // Convert to string to match interface
         email: responseData.user.email,
         firstName: responseData.user.first_name,
         lastName: responseData.user.last_name,
@@ -1051,35 +1101,123 @@ export class ApiClient {
 
   // Document Methods
   async getDocuments(filters?: SearchFilters): Promise<ApiResponse<Document[]>> {
-    await delay();
-
-    const user = this.getCurrentUser();
-    let documents = mockDataStore.getDocuments();
-
-    // Filter by teacher if not admin
-    if (user.role === 'teacher') {
-      documents = documents.filter(d => d.teacher.user.id === user.id);
-    }
-
-    // Apply filters
-    if (filters) {
-      if (filters.category) {
-        documents = documents.filter(d => d.category.id === filters.category);
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
       }
-      if (filters.query) {
-        const query = filters.query.toLowerCase();
-        documents = documents.filter(d => 
-          d.title.toLowerCase().includes(query) ||
-          d.description?.toLowerCase().includes(query)
-        );
-      }
-    }
 
-    return {
-      success: true,
-      data: documents,
-      message: 'Documents retrieved successfully',
-    };
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters?.category) {
+        params.append('category', filters.category);
+      }
+      if (filters?.status) {
+        params.append('status', filters.status);
+      }
+      if (filters?.teacher) {
+        params.append('teacher', filters.teacher);
+      }
+      if (filters?.fileType) {
+        params.append('file_type', filters.fileType);
+      }
+      if (filters?.query) {
+        params.append('search', filters.query);
+      }
+
+      const queryString = params.toString();
+      const url = queryString 
+        ? `${config.api.baseUrl}/documents/documents/?${queryString}`
+        : `${config.api.baseUrl}/documents/documents/`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      
+      // Convert backend response to frontend Document interface
+      const documents: Document[] = data.map((doc: any) => ({
+        id: doc.id,
+        title: doc.title,
+        description: doc.description,
+        fileName: doc.file_name,
+        fileSize: doc.file_size,
+        fileType: doc.file_type,
+        filePath: doc.file,
+        category: {
+          id: doc.category,
+          name: doc.category_name,
+          description: '',
+          requiresClassSubject: false,
+          isActive: true,
+          documentsCount: 0,
+          createdAt: '',
+          updatedAt: '',
+        },
+        teacher: {
+          id: doc.teacher,
+          user: {
+            id: doc.teacher,
+            email: '',
+            firstName: doc.teacher_name.split(' ')[0] || '',
+            lastName: doc.teacher_name.split(' ').slice(1).join(' ') || '',
+            role: 'teacher',
+            phoneNumber: '',
+            bio: '',
+            profilePicture: undefined,
+            isActive: true,
+            dateJoined: '',
+          },
+          specialization: '',
+          employeeId: '',
+          department: '',
+          qualifications: [],
+          yearsOfExperience: 0,
+          classesTeaching: [],
+          subjectsTeaching: [],
+          documentsCount: 0,
+          sharedDocumentsCount: 0,
+          approvalStatus: 'approved',
+          experience: '',
+          isApproved: true,
+          isSuspended: false,
+          rejectionReason: null,
+          approvalDate: null,
+          createdAt: '',
+          updatedAt: '',
+        },
+        classLevel: doc.class_level,
+        subject: doc.subject,
+        isShared: doc.is_shared,
+        sharedAt: doc.shared_at,
+        downloadCount: doc.download_count,
+        status: doc.status,
+        sharedWith: doc.shared_with_users || [],
+        tags: [],
+        createdAt: doc.created_at,
+        updatedAt: doc.updated_at,
+      }));
+
+      return {
+        success: true,
+        data: documents,
+        message: 'Documents retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch documents', 500);
+    }
   }
 
   async createDocument(data: DocumentCreateRequest): Promise<ApiResponse<Document>> {
@@ -1144,16 +1282,6 @@ export class ApiClient {
     const updatedCategories = categories.map(c => c.id === category.id ? category : c);
     mockDataStore.saveCategories(updatedCategories);
 
-    // Log activity
-    mockDataStore.addActivityLog({
-      user,
-      action: 'upload',
-      targetType: 'document',
-      targetId: newDocument.id,
-      targetName: newDocument.title,
-      description: `uploaded "${newDocument.title}"`,
-    });
-
     return {
       success: true,
       data: newDocument,
@@ -1198,21 +1326,209 @@ export class ApiClient {
       mockDataStore.saveTeachers(updatedTeachers);
     }
 
-    // Log activity
-    mockDataStore.addActivityLog({
-      user,
-      action: 'share',
-      targetType: 'document',
-      targetId: document.id,
-      targetName: document.title,
-      description: `${data.isShared ? 'shared' : 'unshared'} "${document.title}"`,
-    });
-
     return {
       success: true,
       data: document,
       message: `Document ${data.isShared ? 'shared' : 'unshared'} successfully`,
     };
+  }
+
+  async deleteDocument(documentId: string): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      return {
+        success: true,
+        data: { message: 'Document deleted successfully' },
+        message: 'Document deleted successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to delete document', 500);
+    }
+  }
+
+  async updateDocument(documentId: string, data: DocumentUpdateRequest): Promise<ApiResponse<Document>> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      // Convert camelCase to snake_case for backend
+      const backendData: any = {};
+      if (data.title !== undefined) backendData.title = data.title;
+      if (data.description !== undefined) backendData.description = data.description;
+      if (data.status !== undefined) backendData.status = data.status;
+      if (data.classLevel !== undefined) backendData.class_level = data.classLevel;
+      if (data.subject !== undefined) backendData.subject = data.subject;
+      if (data.categoryId !== undefined) backendData.category = data.categoryId;
+
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(backendData),
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const responseData = await response.json();
+      
+      // Convert backend response to frontend Document interface
+      const document: Document = {
+        id: responseData.id,
+        title: responseData.title,
+        description: responseData.description,
+        fileName: responseData.file_name,
+        fileSize: responseData.file_size,
+        fileType: responseData.file_type,
+        filePath: responseData.file,
+        category: {
+          id: responseData.category,
+          name: responseData.category_name,
+          description: '',
+          requiresClassSubject: false,
+          isActive: true,
+          documentsCount: 0,
+          createdAt: '',
+          updatedAt: '',
+        },
+        teacher: {
+          id: responseData.teacher,
+          user: {
+            id: responseData.teacher,
+            email: '',
+            firstName: responseData.teacher_name.split(' ')[0] || '',
+            lastName: responseData.teacher_name.split(' ').slice(1).join(' ') || '',
+            role: 'teacher',
+            phoneNumber: '',
+            bio: '',
+            profilePicture: undefined,
+            isActive: true,
+            dateJoined: responseData.created_at,
+          },
+          status: 'active',
+          documentsCount: 0,
+          sharedDocumentsCount: 0,
+          totalDownloads: 0,
+          createdAt: responseData.created_at,
+          updatedAt: responseData.updated_at,
+        },
+        classLevel: responseData.class_level,
+        subject: responseData.subject,
+        isShared: responseData.is_shared,
+        sharedAt: responseData.shared_at,
+        downloadCount: responseData.download_count,
+        status: responseData.status,
+        sharedWith: responseData.shared_with_users || [],
+        tags: [],
+        createdAt: responseData.created_at,
+        updatedAt: responseData.updated_at,
+      };
+
+      return {
+        success: true,
+        data: document,
+        message: 'Document updated successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to update document', 500);
+    }
+  }
+
+  async flagDocument(documentId: string): Promise<ApiResponse<{ message: string; document_status: string }>> {
+    this.requireRole('admin');
+    
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/flag/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data,
+        message: data.message,
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to flag document', 500);
+    }
+  }
+
+  async archiveDocument(documentId: string): Promise<ApiResponse<{ message: string; document_status: string }>> {
+    this.requireRole('admin');
+    
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/archive/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: data,
+        message: data.message,
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to archive document', 500);
+    }
   }
 
   // Category Methods
@@ -1739,16 +2055,111 @@ export class ApiClient {
 
   // Activity Methods
   async getActivityLogs(): Promise<ApiResponse<ActivityLog[]>> {
-    await delay();
-
     this.requireRole('admin');
-    const logs = mockDataStore.getActivityLogs();
+    
+    try {
+      const response = await this.makeRequest<any[]>(API_ENDPOINTS.AUDIT.LOGS, {
+        method: 'GET',
+      });
 
-    return {
-      success: true,
-      data: logs,
-      message: 'Activity logs retrieved successfully',
+      // Transform backend data to frontend format, filtering out invalid entries
+      const transformedLogs: ActivityLog[] = response.data
+        .filter((log: any) => log && log.user_id && log.id) // Filter out logs without valid user_id or id
+        .map((log: any) => ({
+          id: log.id.toString(),
+          user: {
+            id: log.user_id.toString(),
+            email: log.user_email || '',
+            firstName: log.user_name?.split(' ')[0] || 'Unknown',
+            lastName: log.user_name?.split(' ').slice(1).join(' ') || '',
+            role: log.user_role || 'teacher',
+            isActive: true,
+            dateJoined: log.created_at || new Date().toISOString(),
+          },
+          action: this.mapBackendActionToFrontend(log.action || ''),
+          targetType: log.target_type || undefined,
+          targetId: log.target_id ? log.target_id.toString() : undefined,
+          targetName: log.target_name || undefined,
+          description: log.description || '',
+          ipAddress: log.ip_address || undefined,
+          userAgent: log.user_agent || undefined,
+          severity: this.mapBackendSeverityToFrontend(log.severity || 'LOW'),
+          metadata: log.metadata || undefined,
+          createdAt: log.created_at || new Date().toISOString(),
+        }));
+
+      return {
+        success: true,
+        data: transformedLogs,
+        message: 'Activity logs retrieved successfully',
+      };
+    } catch (error) {
+      console.error('Failed to fetch activity logs:', error);
+      throw error;
+    }
+  }
+
+  private mapBackendActionToFrontend(backendAction: string): ActivityAction {
+    if (!backendAction || typeof backendAction !== 'string') {
+      return 'view'; // Default fallback action
+    }
+    
+    // Convert to uppercase for consistent mapping
+    const upperAction = backendAction.toUpperCase();
+    
+    const actionMapping: Record<string, ActivityAction> = {
+      // Document actions
+      'CREATE_DOCUMENT': 'create',
+      'UPLOAD_DOCUMENT': 'create',
+      'DOCUMENT_UPLOADED': 'create',
+      'UPDATE_DOCUMENT': 'update',
+      'MODIFY_DOCUMENT': 'update',
+      'EDIT_DOCUMENT': 'update',
+      'DELETE_DOCUMENT': 'delete',
+      'REMOVE_DOCUMENT': 'delete',
+      'VIEW_DOCUMENT': 'view',
+      'ACCESS_DOCUMENT': 'view',
+      'DOWNLOAD_DOCUMENT': 'download',
+      'SHARE_DOCUMENT': 'share',
+      'FLAG_DOCUMENT': 'flag',
+      'UNFLAG_DOCUMENT': 'flag',
+      'ARCHIVE_DOCUMENT': 'archive',
+      
+      // Auth actions
+      'LOGIN': 'login',
+      'LOGIN_SUCCESS': 'login',
+      'LOGOUT': 'logout',
+      
+      // User actions
+      'CREATE_USER': 'create',
+      'UPDATE_USER': 'update',
+      'DELETE_USER': 'delete',
+      'APPROVE_USER': 'approve',
+      'REJECT_USER': 'reject',
     };
+
+    return actionMapping[upperAction] || 'view';
+  }
+
+  private mapBackendSeverityToFrontend(backendSeverity: string): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
+    if (!backendSeverity || typeof backendSeverity !== 'string') {
+      return 'LOW'; // Default fallback severity
+    }
+    
+    // Convert to uppercase for consistent mapping
+    const upperSeverity = backendSeverity.toUpperCase();
+    
+    const severityMapping: Record<string, 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'> = {
+      'INFO': 'LOW',
+      'WARNING': 'MEDIUM',
+      'ERROR': 'HIGH',
+      'CRITICAL': 'CRITICAL',
+      'LOW': 'LOW',
+      'MEDIUM': 'MEDIUM',
+      'HIGH': 'HIGH',
+    };
+
+    return severityMapping[upperSeverity] || 'LOW';
   }
 }
 

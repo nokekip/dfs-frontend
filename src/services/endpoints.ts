@@ -71,6 +71,13 @@ export const API_ENDPOINTS = {
     SYSTEM_HEALTH: `${API_BASE_URL}/admin/health/`,
   },
 
+  // Audit endpoints
+  AUDIT: {
+    LOGS: `${API_BASE_URL}/audit/logs/`,
+    EXPORT: `${API_BASE_URL}/audit/logs/export/`,
+    SUMMARY: `${API_BASE_URL}/audit/logs/summary/`,
+  },
+
   // Search endpoints
   SEARCH: {
     DOCUMENTS: `${API_BASE_URL}/search/documents/`,

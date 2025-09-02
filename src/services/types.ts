@@ -6,7 +6,7 @@
 export type UserRole = 'admin' | 'teacher';
 export type TeacherStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 export type DocumentStatus = 'active' | 'flagged' | 'archived' | 'published';
-export type ActivityAction = 'upload' | 'delete' | 'share' | 'login' | 'register' | 'approve' | 'reject' | 'create' | 'update';
+export type ActivityAction = 'create' | 'update' | 'delete' | 'view' | 'download' | 'share' | 'flag' | 'archive' | 'login' | 'logout' | 'approve' | 'reject';
 
 // User & Authentication types
 export interface User {
@@ -160,6 +160,7 @@ export interface DocumentUpdateRequest {
   categoryId?: string;
   classLevel?: string;
   subject?: string;
+  status?: string;
   tags?: string[];
 }
 
@@ -192,6 +193,8 @@ export interface ActivityLog {
   description: string;
   ipAddress?: string;
   userAgent?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  metadata?: Record<string, any>;
   createdAt: string;
 }
 
@@ -258,6 +261,7 @@ export interface SearchFilters {
   dateFrom?: string;
   dateTo?: string;
   fileType?: string;
+  status?: string;
   tags?: string[];
 }
 
