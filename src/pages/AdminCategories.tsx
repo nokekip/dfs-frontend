@@ -6,6 +6,8 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
+import { useCategories } from '../hooks/useCategories';
+import { DocumentCategory, CategoryCreateRequest, CategoryUpdateRequest } from '../services/types';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -38,17 +40,6 @@ import {
   X
 } from 'lucide-react';
 
-interface Category {
-  id: string;
-  name: string;
-  description: string;
-  requiresClassSubject: boolean;
-  documentsCount: number;
-  isActive: boolean;
-  createdDate: string;
-  lastModified: string;
-}
-
 interface CategoryFormData {
   name: string;
   description: string;
@@ -56,10 +47,21 @@ interface CategoryFormData {
 }
 
 export default function AdminCategories() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+  const {
+    categories,
+    isLoading,
+    error,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    toggleCategoryStatus,
+    clearError
+  } = useCategories();
+
+  const [filteredCategories, setFilteredCategories] = useState<DocumentCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -71,94 +73,6 @@ export default function AdminCategories() {
     description: '',
     requiresClassSubject: false
   });
-
-  // Mock data - in real app, this would come from Django REST API
-  useEffect(() => {
-    const mockCategories: Category[] = [
-      {
-        id: '1',
-        name: 'Lesson Plans',
-        description: 'Teaching plans and curriculum materials for daily lessons',
-        requiresClassSubject: true,
-        documentsCount: 45,
-        isActive: true,
-        createdDate: '2024-01-01',
-        lastModified: '2024-01-15'
-      },
-      {
-        id: '2',
-        name: 'Assessment Reports',
-        description: 'Student assessment results and progress reports',
-        requiresClassSubject: true,
-        documentsCount: 32,
-        isActive: true,
-        createdDate: '2024-01-01',
-        lastModified: '2024-01-12'
-      },
-      {
-        id: '3',
-        name: 'Student Records',
-        description: 'Individual student files and academic records',
-        requiresClassSubject: true,
-        documentsCount: 28,
-        isActive: true,
-        createdDate: '2024-01-01',
-        lastModified: '2024-01-10'
-      },
-      {
-        id: '4',
-        name: 'Administrative Forms',
-        description: 'School administrative documents and forms',
-        requiresClassSubject: false,
-        documentsCount: 15,
-        isActive: true,
-        createdDate: '2024-01-01',
-        lastModified: '2024-01-08'
-      },
-      {
-        id: '5',
-        name: 'Professional Development',
-        description: 'Training materials and professional growth documents',
-        requiresClassSubject: false,
-        documentsCount: 12,
-        isActive: true,
-        createdDate: '2024-01-01',
-        lastModified: '2024-01-05'
-      },
-      {
-        id: '6',
-        name: 'Meeting Minutes',
-        description: 'Records of staff meetings and conferences',
-        requiresClassSubject: false,
-        documentsCount: 8,
-        isActive: true,
-        createdDate: '2024-01-01',
-        lastModified: '2024-01-03'
-      },
-      {
-        id: '7',
-        name: 'Curriculum Materials',
-        description: 'Subject-specific teaching resources and materials',
-        requiresClassSubject: true,
-        documentsCount: 18,
-        isActive: true,
-        createdDate: '2024-01-02',
-        lastModified: '2024-01-14'
-      },
-      {
-        id: '8',
-        name: 'Parent Communication',
-        description: 'Letters and communications with parents',
-        requiresClassSubject: false,
-        documentsCount: 5,
-        isActive: false,
-        createdDate: '2024-01-03',
-        lastModified: '2024-01-03'
-      }
-    ];
-    setCategories(mockCategories);
-    setFilteredCategories(mockCategories);
-  }, []);
 
   // Filter categories based on search
   useEffect(() => {
@@ -187,46 +101,52 @@ export default function AdminCategories() {
     setTimeout(() => setActionError(''), 3000);
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (!formData.name.trim()) {
       showError('Category name is required');
       return;
     }
 
-    const newCategory: Category = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...formData,
-      documentsCount: 0,
-      isActive: true,
-      createdDate: new Date().toISOString(),
-      lastModified: new Date().toISOString()
+    const categoryData: CategoryCreateRequest = {
+      name: formData.name,
+      description: formData.description,
+      requiresClassSubject: formData.requiresClassSubject
     };
 
-    setCategories(prev => [...prev, newCategory]);
-    setAddDialogOpen(false);
-    setFormData({ name: '', description: '', requiresClassSubject: false });
-    showSuccess('Category created successfully!');
+    const success = await createCategory(categoryData);
+    if (success) {
+      setAddDialogOpen(false);
+      setFormData({ name: '', description: '', requiresClassSubject: false });
+      showSuccess('Category created successfully!');
+    } else {
+      showError('Failed to create category');
+    }
   };
 
-  const handleEditCategory = () => {
+  const handleEditCategory = async () => {
     if (!selectedCategory || !formData.name.trim()) {
       showError('Category name is required');
       return;
     }
 
-    setCategories(prev => prev.map(category =>
-      category.id === selectedCategory.id
-        ? { ...category, ...formData, lastModified: new Date().toISOString() }
-        : category
-    ));
+    const updateData: CategoryUpdateRequest = {
+      name: formData.name,
+      description: formData.description,
+      requiresClassSubject: formData.requiresClassSubject
+    };
 
-    setEditDialogOpen(false);
-    setSelectedCategory(null);
-    setFormData({ name: '', description: '', requiresClassSubject: false });
-    showSuccess('Category updated successfully!');
+    const success = await updateCategory(selectedCategory.id, updateData);
+    if (success) {
+      setEditDialogOpen(false);
+      setSelectedCategory(null);
+      setFormData({ name: '', description: '', requiresClassSubject: false });
+      showSuccess('Category updated successfully!');
+    } else {
+      showError('Failed to update category');
+    }
   };
 
-  const handleDeleteCategory = () => {
+  const handleDeleteCategory = async () => {
     if (!selectedCategory) return;
 
     if (selectedCategory.documentsCount > 0) {
@@ -236,28 +156,32 @@ export default function AdminCategories() {
       return;
     }
 
-    setCategories(prev => prev.filter(category => category.id !== selectedCategory.id));
-    setDeleteDialogOpen(false);
-    setSelectedCategory(null);
-    showSuccess('Category deleted successfully!');
+    const success = await deleteCategory(selectedCategory.id);
+    if (success) {
+      setDeleteDialogOpen(false);
+      setSelectedCategory(null);
+      showSuccess('Category deleted successfully!');
+    } else {
+      showError('Failed to delete category');
+    }
   };
 
-  const handleToggleActive = (category: Category) => {
+  const handleToggleActive = async (category: DocumentCategory) => {
     if (!category.isActive && category.documentsCount > 0) {
       showError('Cannot deactivate category with existing documents');
       return;
     }
 
-    setCategories(prev => prev.map(cat =>
-      cat.id === category.id
-        ? { ...cat, isActive: !cat.isActive, lastModified: new Date().toISOString() }
-        : cat
-    ));
-
-    showSuccess(`Category ${category.isActive ? 'deactivated' : 'activated'} successfully!`);
+    const newStatus = !category.isActive;
+    const success = await toggleCategoryStatus(category.id, newStatus);
+    if (success) {
+      showSuccess(`Category ${category.isActive ? 'deactivated' : 'activated'} successfully!`);
+    } else {
+      showError(`Failed to ${category.isActive ? 'deactivate' : 'activate'} category`);
+    }
   };
 
-  const openEditDialog = (category: Category) => {
+  const openEditDialog = (category: DocumentCategory) => {
     setSelectedCategory(category);
     setFormData({
       name: category.name,
@@ -267,7 +191,7 @@ export default function AdminCategories() {
     setEditDialogOpen(true);
   };
 
-  const openDeleteDialog = (category: Category) => {
+  const openDeleteDialog = (category: DocumentCategory) => {
     setSelectedCategory(category);
     setDeleteDialogOpen(true);
   };
@@ -303,11 +227,11 @@ export default function AdminCategories() {
           </Alert>
         )}
 
-        {actionError && (
+        {(actionError || error) && (
           <Alert className="bg-destructive/10 border-destructive/20">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <AlertDescription className="text-destructive">
-              {actionError}
+              {actionError || error}
             </AlertDescription>
           </Alert>
         )}
@@ -356,7 +280,15 @@ export default function AdminCategories() {
         </Card>
 
         {/* Categories Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading categories...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredCategories.map((category) => (
             <Card key={category.id} className={`hover:shadow-md transition-shadow ${!category.isActive ? 'opacity-60' : ''}`}>
               <CardContent className="p-6">
@@ -427,13 +359,14 @@ export default function AdminCategories() {
                       <FileText className="h-4 w-4" />
                       <span>{category.documentsCount} documents</span>
                     </div>
-                    <span>Modified {formatDate(category.lastModified)}</span>
+                    <span>Modified {formatDate(category.updatedAt)}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Add Category Dialog */}
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

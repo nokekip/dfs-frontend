@@ -119,24 +119,26 @@ export const useCategories = (): CategoriesState & CategoriesActions => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Note: This would be implemented when we add the update category endpoint
-      // For now, we'll simulate the update locally
+      const response = await apiClient.updateCategory(categoryId, data);
       
-      setState(prev => ({
-        ...prev,
-        categories: prev.categories.map(cat => 
-          cat.id === categoryId 
-            ? { ...cat, ...data, updatedAt: new Date().toISOString() }
-            : cat
-        ),
-        isLoading: false,
-      }));
+      if (response.success && response.data) {
+        setState(prev => ({
+          ...prev,
+          categories: prev.categories.map(cat => 
+            cat.id === categoryId ? response.data! : cat
+          ),
+          isLoading: false,
+        }));
 
-      toast.success('Category Updated', {
-        description: 'Category has been updated successfully.',
-      });
+        toast.success('Category Updated', {
+          description: response.message,
+        });
 
-      return true;
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
     } catch (error) {
       const errorMessage = error instanceof ApiError 
         ? error.message 
@@ -207,27 +209,29 @@ export const useCategories = (): CategoriesState & CategoriesActions => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Note: This would use the update endpoint with isActive flag
-      const data: CategoryUpdateRequest = { isActive };
+      const response = await apiClient.toggleCategoryActive(categoryId);
       
-      setState(prev => ({
-        ...prev,
-        categories: prev.categories.map(cat => 
-          cat.id === categoryId 
-            ? { ...cat, isActive, updatedAt: new Date().toISOString() }
-            : cat
-        ),
-        isLoading: false,
-      }));
+      if (response.success && response.data) {
+        setState(prev => ({
+          ...prev,
+          categories: prev.categories.map(cat => 
+            cat.id === categoryId ? response.data! : cat
+          ),
+          isLoading: false,
+        }));
 
-      toast.success(
-        isActive ? 'Category Activated' : 'Category Deactivated',
-        {
-          description: `Category has been ${isActive ? 'activated' : 'deactivated'} successfully.`,
-        }
-      );
+        toast.success(
+          response.data.isActive ? 'Category Activated' : 'Category Deactivated',
+          {
+            description: response.message,
+          }
+        );
 
-      return true;
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
     } catch (error) {
       const errorMessage = error instanceof ApiError 
         ? error.message 

@@ -1217,78 +1217,285 @@ export class ApiClient {
 
   // Category Methods
   async getCategories(): Promise<ApiResponse<DocumentCategory[]>> {
-    await delay();
-
-    const categories = mockDataStore.getCategories();
+    this.requireRole('admin');
     
-    return {
-      success: true,
-      data: categories,
-      message: 'Categories retrieved successfully',
-    };
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/categories/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      
+      // Convert backend response to frontend DocumentCategory interface
+      const categories: DocumentCategory[] = data.map((category: any) => ({
+        id: category.id,
+        name: category.name,
+        description: category.description,
+        requiresClassSubject: category.requires_class_subject,
+        isActive: category.is_active,
+        documentsCount: category.documents_count,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+      }));
+
+      return {
+        success: true,
+        data: categories,
+        message: 'Categories retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch categories', 500);
+    }
   }
 
   async createCategory(data: CategoryCreateRequest): Promise<ApiResponse<DocumentCategory>> {
-    await delay();
-
     this.requireRole('admin');
 
-    const categories = mockDataStore.getCategories();
-    const existingCategory = categories.find(c => 
-      c.name.toLowerCase() === data.name.toLowerCase()
-    );
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    if (existingCategory) {
-      simulateError('Category name already exists', 400);
+      // Convert frontend data to backend format
+      const payload = {
+        name: data.name,
+        description: data.description || '',
+        requires_class_subject: data.requiresClassSubject,
+      };
+
+      const response = await fetch(`${config.api.baseUrl}/documents/categories/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 400 && errorData.name?.[0]?.includes('already exists')) {
+          throw new ApiError('Category name already exists', 400);
+        }
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const category = await response.json();
+      
+      // Convert backend response to frontend format
+      const newCategory: DocumentCategory = {
+        id: category.id,
+        name: category.name,
+        description: category.description,
+        requiresClassSubject: category.requires_class_subject,
+        isActive: category.is_active,
+        documentsCount: category.documents_count,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+      };
+
+      return {
+        success: true,
+        data: newCategory,
+        message: 'Category created successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to create category', 500);
     }
-
-    const newCategory: DocumentCategory = {
-      id: mockDataStore.generateId(),
-      name: data.name,
-      description: data.description || '',
-      requiresClassSubject: data.requiresClassSubject,
-      documentsCount: 0,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    categories.push(newCategory);
-    mockDataStore.saveCategories(categories);
-
-    return {
-      success: true,
-      data: newCategory,
-      message: 'Category created successfully',
-    };
   }
 
   async deleteCategory(categoryId: string): Promise<ApiResponse<{ message: string }>> {
-    await delay();
-
     this.requireRole('admin');
 
-    const categories = mockDataStore.getCategories();
-    const categoryIndex = categories.findIndex(c => c.id === categoryId);
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    if (categoryIndex === -1) {
-      simulateError('Category not found', 404);
+      const response = await fetch(`${config.api.baseUrl}/documents/categories/${categoryId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 404) {
+          throw new ApiError('Category not found', 404);
+        }
+        if (response.status === 400 && errorData.detail?.includes('existing documents')) {
+          throw new ApiError('Cannot delete category with existing documents', 400);
+        }
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      return {
+        success: true,
+        data: { message: 'Category deleted successfully' },
+        message: 'Category deleted successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to delete category', 500);
     }
+  }
 
-    const category = categories[categoryIndex];
+  async updateCategory(categoryId: string, data: CategoryUpdateRequest): Promise<ApiResponse<DocumentCategory>> {
+    this.requireRole('admin');
 
-    if (category.documentsCount > 0) {
-      simulateError('Cannot delete category with existing documents', 400);
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      // Convert frontend data to backend format
+      const payload: any = {};
+      if (data.name !== undefined) payload.name = data.name;
+      if (data.description !== undefined) payload.description = data.description;
+      if (data.requiresClassSubject !== undefined) payload.requires_class_subject = data.requiresClassSubject;
+      if (data.isActive !== undefined) payload.is_active = data.isActive;
+
+      const response = await fetch(`${config.api.baseUrl}/documents/categories/${categoryId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 404) {
+          throw new ApiError('Category not found', 404);
+        }
+        if (response.status === 400 && errorData.name?.[0]?.includes('already exists')) {
+          throw new ApiError('Category name already exists', 400);
+        }
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const category = await response.json();
+      
+      // Convert backend response to frontend format
+      const updatedCategory: DocumentCategory = {
+        id: category.id,
+        name: category.name,
+        description: category.description,
+        requiresClassSubject: category.requires_class_subject,
+        isActive: category.is_active,
+        documentsCount: category.documents_count,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+      };
+
+      return {
+        success: true,
+        data: updatedCategory,
+        message: 'Category updated successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to update category', 500);
     }
+  }
 
-    categories.splice(categoryIndex, 1);
-    mockDataStore.saveCategories(categories);
+  async toggleCategoryActive(categoryId: string): Promise<ApiResponse<DocumentCategory>> {
+    this.requireRole('admin');
 
-    return {
-      success: true,
-      data: { message: 'Category deleted successfully' },
-      message: 'Category deleted successfully',
-    };
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/categories/${categoryId}/toggle_active/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 404) {
+          throw new ApiError('Category not found', 404);
+        }
+        if (response.status === 403) {
+          throw new ApiError('You do not have permission to manage categories', 403);
+        }
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      
+      // We need to fetch the updated category to get the full data
+      const categoryResponse = await fetch(`${config.api.baseUrl}/documents/categories/${categoryId}/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!categoryResponse.ok) {
+        throw new ApiError('Failed to fetch updated category', 500);
+      }
+
+      const category = await categoryResponse.json();
+      
+      // Convert backend response to frontend format
+      const updatedCategory: DocumentCategory = {
+        id: category.id,
+        name: category.name,
+        description: category.description,
+        requiresClassSubject: category.requires_class_subject,
+        isActive: category.is_active,
+        documentsCount: category.documents_count,
+        createdAt: category.created_at,
+        updatedAt: category.updated_at,
+      };
+
+      return {
+        success: true,
+        data: updatedCategory,
+        message: `Category ${data.is_active ? 'activated' : 'deactivated'} successfully`,
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to toggle category status', 500);
+    }
   }
 
   // Dashboard Methods
