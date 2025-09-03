@@ -18,6 +18,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 // Pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import PublicShare from "./pages/PublicShare";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import TeacherUpload from "./pages/TeacherUpload";
 import TeacherDocuments from "./pages/TeacherDocuments";
@@ -66,6 +67,7 @@ const App = () => (
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/shared/:documentId/:token" element={<PublicShare />} />
               
               {/* Dashboard Redirect */}
               <Route path="/" element={<DashboardRouter />} />

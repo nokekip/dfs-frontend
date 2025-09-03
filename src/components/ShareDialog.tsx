@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { apiClient } from '../services/api';
+import { DocumentShareRequest } from '../services/types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -29,14 +31,7 @@ interface ShareDialogProps {
   document: Document | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onShare: (shareData: ShareData) => void;
-}
-
-interface ShareData {
-  isPublic: boolean;
-  emails: string[];
-  message?: string;
-  publicLink?: string;
+  onShare?: () => void; // Callback after successful share
 }
 
 export default function ShareDialog({ document, open, onOpenChange, onShare }: ShareDialogProps) {
@@ -46,14 +41,20 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
   const [message, setMessage] = useState('');
   const [publicLink, setPublicLink] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
-  const generatePublicLink = () => {
-    if (!document) return;
-    const baseUrl = window.location.origin;
-    const shareId = Math.random().toString(36).substr(2, 9);
-    const link = `${baseUrl}/shared/${document.id}/${shareId}`;
-    setPublicLink(link);
-  };
+  // Reset form when dialog opens/closes or document changes
+  useEffect(() => {
+    if (!open) {
+      setIsPublic(false);
+      setEmails([]);
+      setCurrentEmail('');
+      setMessage('');
+      setPublicLink('');
+      setCopySuccess(false);
+      setIsSharing(false);
+    }
+  }, [open, document]);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -94,21 +95,83 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const handleShare = () => {
-    const shareData: ShareData = {
-      isPublic,
-      emails,
-      message: message.trim() || undefined,
-      publicLink: isPublic ? publicLink : undefined
-    };
-    onShare(shareData);
-    onOpenChange(false);
-    // Reset form
-    setIsPublic(false);
-    setEmails([]);
-    setCurrentEmail('');
-    setMessage('');
-    setPublicLink('');
+  const handleShare = async () => {
+    if (!document) return;
+    
+    setIsSharing(true);
+    
+    try {
+      if (isPublic) {
+        // Create public share
+        const shareRequest: DocumentShareRequest = {
+          share_type: 'public',
+          can_download: true,
+          can_view: true,
+        };
+        
+        const response = await apiClient.shareDocument(document.id, shareRequest);
+        
+        if (response.success && response.data.public_url) {
+          const fullUrl = `${window.location.origin}${response.data.public_url}`;
+          setPublicLink(fullUrl);
+          
+          toast.success('Public Link Created', {
+            description: 'Document is now publicly accessible via the link'
+          });
+        }
+      }
+      
+      // Handle private shares (emails)
+      for (const email of emails) {
+        // In a real implementation, you'd resolve email to teacher ID
+        // For now, we'll skip this or you could add a teacher search API
+        toast.info('Private sharing not yet implemented', {
+          description: 'Email-based sharing will be available soon'
+        });
+      }
+      
+      if (onShare) {
+        onShare();
+      }
+      
+    } catch (error) {
+      toast.error('Share Failed', {
+        description: 'Failed to create share link. Please try again.'
+      });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleUnshare = async () => {
+    if (!document) return;
+    
+    setIsSharing(true);
+    
+    try {
+      const response = await apiClient.unshareDocument(document.id);
+      
+      if (response.success) {
+        toast.success('Document Unshared', {
+          description: response.data.message || 'All shares have been revoked'
+        });
+        
+        // Reset form
+        setIsPublic(false);
+        setPublicLink('');
+        setEmails([]);
+        
+        if (onShare) {
+          onShare(); // Refresh parent component
+        }
+      }
+    } catch (error) {
+      toast.error('Unshare Failed', {
+        description: 'Failed to unshare document. Please try again.'
+      });
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -153,14 +216,21 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
                 checked={isPublic}
                 onCheckedChange={(checked) => {
                   setIsPublic(checked);
-                  if (checked) {
-                    generatePublicLink();
-                  } else {
+                  if (!checked) {
                     setPublicLink('');
                   }
                 }}
               />
             </div>
+
+            {isPublic && !publicLink && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  <Globe className="h-4 w-4 inline mr-2" />
+                  Click "Generate Public Link" to create a shareable link that anyone can access.
+                </p>
+              </div>
+            )}
 
             {isPublic && publicLink && (
               <div className="space-y-2">
@@ -262,12 +332,27 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
+          
+          {/* Show unshare button if document is currently shared */}
+          {document.isShared && (
+            <Button 
+              variant="destructive"
+              onClick={handleUnshare}
+              disabled={isSharing}
+            >
+              <X className="h-4 w-4 mr-2" />
+              {isSharing ? 'Unsharing...' : 'Unshare Document'}
+            </Button>
+          )}
+          
           <Button 
             onClick={handleShare}
-            disabled={!isPublic && emails.length === 0}
+            disabled={(!isPublic && emails.length === 0) || isSharing}
           >
             <Share className="h-4 w-4 mr-2" />
-            Share Document
+            {isSharing ? 'Creating Share...' : 
+             isPublic && !publicLink ? 'Generate Public Link' : 
+             'Share Document'}
           </Button>
         </DialogFooter>
       </DialogContent>
