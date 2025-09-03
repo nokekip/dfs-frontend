@@ -22,6 +22,7 @@ import {
   DocumentCreateRequest,
   DocumentUpdateRequest,
   DocumentShareRequest,
+  DocumentShare,
   DocumentCategory,
   CategoryCreateRequest,
   CategoryUpdateRequest,
@@ -1293,48 +1294,92 @@ export class ApiClient {
     }
   }
 
-  async shareDocument(documentId: string, data: DocumentShareRequest): Promise<ApiResponse<Document>> {
-    await delay();
+  async shareDocument(documentId: string, shareData: DocumentShareRequest): Promise<ApiResponse<DocumentShare>> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    const user = this.getCurrentUser();
-    const documents = mockDataStore.getDocuments();
-    const documentIndex = documents.findIndex(d => d.id === documentId);
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/share/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(shareData),
+      });
 
-    if (documentIndex === -1) {
-      simulateError('Document not found', 404);
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const responseData = await response.json();
+
+      // Transform snake_case to camelCase
+      const transformedData: DocumentShare = {
+        id: responseData.id,
+        document: responseData.document,
+        shared_by: responseData.shared_by,
+        shared_with: responseData.shared_with,
+        share_type: responseData.share_type,
+        share_token: responseData.share_token,
+        can_download: responseData.can_download,
+        can_view: responseData.can_view,
+        is_active: responseData.is_active,
+        expires_at: responseData.expires_at,
+        shared_at: responseData.shared_at,
+        public_url: responseData.public_url,
+      };
+
+      return {
+        success: true,
+        data: transformedData,
+        message: 'Document shared successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to share document', 500);
     }
+  }
 
-    const document = documents[documentIndex];
+  async unshareDocument(documentId: string): Promise<ApiResponse<{ message: string; shares_revoked: number }>> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    // Check permissions
-    if (user.role === 'teacher' && document.teacher.user.id !== user.id) {
-      simulateError('You can only share your own documents', 403);
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/unshare/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const responseData = await response.json();
+
+      return {
+        success: true,
+        data: {
+          message: responseData.message,
+          shares_revoked: responseData.shares_revoked,
+        },
+        message: 'Document unshared successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to unshare document', 500);
     }
-
-    document.isShared = data.isShared;
-    document.sharedAt = data.isShared ? new Date().toISOString() : undefined;
-    document.updatedAt = new Date().toISOString();
-
-    documents[documentIndex] = document;
-    mockDataStore.saveDocuments(documents);
-
-    // Update teacher shared documents count
-    const teachers = mockDataStore.getTeachers();
-    const teacher = teachers.find(t => t.id === document.teacher.id);
-    if (teacher) {
-      teacher.sharedDocumentsCount = documents.filter(d => 
-        d.teacher.id === teacher.id && d.isShared
-      ).length;
-      teacher.updatedAt = new Date().toISOString();
-      const updatedTeachers = teachers.map(t => t.id === teacher.id ? teacher : t);
-      mockDataStore.saveTeachers(updatedTeachers);
-    }
-
-    return {
-      success: true,
-      data: document,
-      message: `Document ${data.isShared ? 'shared' : 'unshared'} successfully`,
-    };
   }
 
   async deleteDocument(documentId: string): Promise<ApiResponse<{ message: string }>> {
@@ -1366,6 +1411,94 @@ export class ApiClient {
         throw error;
       }
       throw new ApiError('Failed to delete document', 500);
+    }
+  }
+
+  async previewDocument(documentId: string, shareToken?: string): Promise<string> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const url = new URL(`${config.api.baseUrl}/documents/documents/${documentId}/preview/`);
+      if (shareToken) {
+        url.searchParams.append('token', shareToken);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      // Create blob URL for preview
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to preview document', 500);
+    }
+  }
+
+  async downloadDocument(documentId: string, shareToken?: string): Promise<void> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const url = new URL(`${config.api.baseUrl}/documents/documents/${documentId}/download/`);
+      if (shareToken) {
+        url.searchParams.append('token', shareToken);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      // Get filename from Content-Disposition header or use a default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = 'download';
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (fileNameMatch && fileNameMatch[1]) {
+          fileName = fileNameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to download document', 500);
     }
   }
 
@@ -2123,6 +2256,7 @@ export class ApiClient {
       'REMOVE_DOCUMENT': 'delete',
       'VIEW_DOCUMENT': 'view',
       'ACCESS_DOCUMENT': 'view',
+      'PREVIEW_DOCUMENT': 'preview',
       'DOWNLOAD_DOCUMENT': 'download',
       'SHARE_DOCUMENT': 'share',
       'FLAG_DOCUMENT': 'flag',

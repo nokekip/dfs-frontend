@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import ShareDialog from '../components/ShareDialog';
+import FilePreviewModal from '../components/FilePreviewModal';
+import { apiClient } from '../services/api';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -57,6 +59,8 @@ export default function TeacherShared() {
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Filter documents shared with me and shared by me
   const sharedWithMe = documents.filter(doc => 
@@ -93,19 +97,22 @@ export default function TeacherShared() {
     });
   };
 
-  const handleDownload = (document: any) => {
-    toast.success('Download Started', {
-      description: `Downloading ${document.file_name || document.title}`
-    });
-    // In real app, this would trigger actual download
+  const handleDownload = async (document: any) => {
+    try {
+      await apiClient.downloadDocument(document.id);
+      toast.success('Download Started', {
+        description: `${document.fileName || document.title} is being downloaded`
+      });
+    } catch (error) {
+      toast.error('Download Failed', {
+        description: 'Failed to download file. Please try again.'
+      });
+    }
   };
 
   const handlePreview = (document: any) => {
-    toast.info('Opening Preview', {
-      description: `Opening ${document.file_name || document.title} in preview`
-    });
-    // In real app, this would open document in preview modal or new tab
-    window.open(`/preview/${document.id}`, '_blank');
+    setPreviewFile(document);
+    setIsPreviewOpen(true);
   };
 
   const handleRequestAccess = (document: any) => {
@@ -521,6 +528,16 @@ export default function TeacherShared() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* File Preview Modal */}
+        <FilePreviewModal
+          file={previewFile}
+          isOpen={isPreviewOpen}
+          onClose={() => {
+            setIsPreviewOpen(false);
+            setPreviewFile(null);
+          }}
+        />
       </div>
     </Layout>
   );

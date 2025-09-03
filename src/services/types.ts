@@ -6,7 +6,7 @@
 export type UserRole = 'admin' | 'teacher';
 export type TeacherStatus = 'active' | 'pending' | 'suspended' | 'rejected';
 export type DocumentStatus = 'active' | 'flagged' | 'archived' | 'published';
-export type ActivityAction = 'create' | 'update' | 'delete' | 'view' | 'download' | 'share' | 'flag' | 'archive' | 'login' | 'logout' | 'approve' | 'reject';
+export type ActivityAction = 'create' | 'update' | 'delete' | 'view' | 'download' | 'share' | 'flag' | 'archive' | 'login' | 'logout' | 'approve' | 'reject' | 'preview';
 
 // User & Authentication types
 export interface User {
@@ -165,7 +165,26 @@ export interface DocumentUpdateRequest {
 }
 
 export interface DocumentShareRequest {
-  isShared: boolean;
+  share_type: 'public' | 'private';
+  shared_with?: string; // Teacher ID for private shares
+  can_download?: boolean;
+  can_view?: boolean;
+  expires_at?: string; // ISO date string
+}
+
+export interface DocumentShare {
+  id: string;
+  document: string; // Document ID
+  shared_by: string; // Teacher ID
+  shared_with?: string; // Teacher ID for private shares
+  share_type: 'public' | 'private';
+  share_token: string;
+  can_download: boolean;
+  can_view: boolean;
+  is_active: boolean;
+  expires_at?: string;
+  shared_at: string;
+  public_url?: string;
 }
 
 // Category types

@@ -181,29 +181,37 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const data: DocumentShareRequest = { isShared };
-      const response = await apiClient.shareDocument(documentId, data);
-      
-      if (response.success && response.data) {
-        // Update the document in the local state
-        setState(prev => ({
-          ...prev,
-          documents: prev.documents.map(doc => 
-            doc.id === documentId ? response.data! : doc
-          ),
-          isLoading: false,
-        }));
-
-        toast.success(
-          isShared ? 'Document Shared' : 'Document Unshared',
-          {
-            description: isShared 
-              ? 'Document is now publicly accessible.'
-              : 'Document is now private.',
-          }
-        );
-
-        return true;
+      if (isShared) {
+        // Create a public share
+        const data: DocumentShareRequest = { 
+          share_type: 'public',
+          can_download: true,
+          can_view: true
+        };
+        const response = await apiClient.shareDocument(documentId, data);
+        
+        if (response.success) {
+          // Refresh documents to get updated state
+          await fetchDocuments();
+          
+          toast.success('Document Shared', {
+            description: 'Document is now publicly accessible.'
+          });
+          return true;
+        }
+      } else {
+        // Use the proper unshare API
+        const response = await apiClient.unshareDocument(documentId);
+        
+        if (response.success) {
+          // Refresh documents to get updated state
+          await fetchDocuments();
+          
+          toast.success('Document Unshared', {
+            description: response.data.message || 'Document is now private.'
+          });
+          return true;
+        }
       }
 
       setState(prev => ({ ...prev, isLoading: false }));
@@ -228,7 +236,7 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
 
       return false;
     }
-  }, []);
+  }, [fetchDocuments]);
 
   const revokeShare = useCallback(async (documentId: string): Promise<boolean> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));

@@ -41,24 +41,25 @@ export const API_ENDPOINTS = {
 
   // Document management endpoints
   DOCUMENTS: {
-    LIST: `${API_BASE_URL}/documents/`,
-    CREATE: `${API_BASE_URL}/documents/`,
-    DETAIL: (id: string) => `${API_BASE_URL}/documents/${id}/`,
-    UPDATE: (id: string) => `${API_BASE_URL}/documents/${id}/`,
-    DELETE: (id: string) => `${API_BASE_URL}/documents/${id}/`,
-    DOWNLOAD: (id: string) => `${API_BASE_URL}/documents/${id}/download/`,
-    SHARE: (id: string) => `${API_BASE_URL}/documents/${id}/share/`,
-    UNSHARE: (id: string) => `${API_BASE_URL}/documents/${id}/unshare/`,
-    UPLOAD: `${API_BASE_URL}/documents/upload/`,
+    LIST: `${API_BASE_URL}/documents/documents/`,
+    CREATE: `${API_BASE_URL}/documents/documents/`,
+    DETAIL: (id: string) => `${API_BASE_URL}/documents/documents/${id}/`,
+    UPDATE: (id: string) => `${API_BASE_URL}/documents/documents/${id}/`,
+    DELETE: (id: string) => `${API_BASE_URL}/documents/documents/${id}/`,
+    DOWNLOAD: (id: string) => `${API_BASE_URL}/documents/documents/${id}/download/`,
+    PREVIEW: (id: string) => `${API_BASE_URL}/documents/documents/${id}/preview/`,
+    SHARE: (id: string) => `${API_BASE_URL}/documents/documents/${id}/share/`,
+    UNSHARE: (id: string) => `${API_BASE_URL}/documents/documents/${id}/unshare/`,
+    UPLOAD: `${API_BASE_URL}/documents/documents/upload/`,
   },
 
   // Category management endpoints
   CATEGORIES: {
-    LIST: `${API_BASE_URL}/categories/`,
-    CREATE: `${API_BASE_URL}/categories/`,
-    DETAIL: (id: string) => `${API_BASE_URL}/categories/${id}/`,
-    UPDATE: (id: string) => `${API_BASE_URL}/categories/${id}/`,
-    DELETE: (id: string) => `${API_BASE_URL}/categories/${id}/`,
+    LIST: `${API_BASE_URL}/documents/categories/`,
+    CREATE: `${API_BASE_URL}/documents/categories/`,
+    DETAIL: (id: string) => `${API_BASE_URL}/documents/categories/${id}/`,
+    UPDATE: (id: string) => `${API_BASE_URL}/documents/categories/${id}/`,
+    DELETE: (id: string) => `${API_BASE_URL}/documents/categories/${id}/`,
   },
 
   // Admin endpoints

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import ShareDialog from '../components/ShareDialog';
+import FilePreviewModal from '../components/FilePreviewModal';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../components/ui/badge';
 import { useDocuments } from '../hooks/useDocuments';
 import { Document } from '../services/types';
+import { apiClient } from '../services/api';
+import { config } from '../lib/config';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -81,6 +84,8 @@ export default function TeacherDocuments() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<Document | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // Filter and sort documents
@@ -90,7 +95,7 @@ export default function TeacherDocuments() {
                            doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            doc.fileName.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesCategory = selectedCategory === 'all' || doc.category.name === selectedCategory;
+      const matchesCategory = selectedCategory === 'all' || doc.category?.name === selectedCategory;
       const matchesClass = selectedClass === 'all' || doc.classLevel === selectedClass;
       const matchesSubject = selectedSubject === 'all' || doc.subject === selectedSubject;
 
@@ -156,29 +161,22 @@ export default function TeacherDocuments() {
     }
   };
 
-  const handleDownload = (doc: Document) => {
-    // In real app, this would trigger actual download
-    toast.success('Download Started', {
-      description: `Downloading ${doc.fileName}`
-    });
-
-    // Simulate download
-    const link = window.document.createElement('a');
-    link.href = '#'; // In real app, this would be the actual file URL
-    link.download = doc.fileName;
-    link.click();
-
-    toast.success('Download Started', {
-      description: `${doc.fileName} is being downloaded`
-    });
+  const handleDownload = async (doc: Document) => {
+    try {
+      await apiClient.downloadDocument(doc.id);
+      toast.success('Download Started', {
+        description: `${doc.fileName} is being downloaded`
+      });
+    } catch (error) {
+      toast.error('Download Failed', {
+        description: 'Failed to download document. Please try again.'
+      });
+    }
   };
 
   const handlePreview = (document: Document) => {
-    // In real app, this would open document in preview modal or new tab
-    toast.info('Opening Preview', {
-      description: `Opening ${document.fileName} in preview`
-    });
-    window.open(`/preview/${document.id}`, '_blank');
+    setPreviewFile(document);
+    setIsPreviewOpen(true);
   };
 
   const handleShare = (document: Document) => {
@@ -257,7 +255,7 @@ export default function TeacherDocuments() {
     }
   };
 
-  const categories = Array.from(new Set(documents.map(doc => doc.category.name)));
+  const categories = Array.from(new Set(documents.map(doc => doc.category?.name).filter(Boolean)));
   const classes = Array.from(new Set(documents.map(doc => doc.classLevel).filter(Boolean)));
   const subjects = Array.from(new Set(documents.map(doc => doc.subject).filter(Boolean)));
 
@@ -462,7 +460,7 @@ export default function TeacherDocuments() {
                     
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-xs">
-                        {document.category.name}
+                        {document.category?.name || 'Uncategorized'}
                       </Badge>
                       {document.classLevel && document.subject && (
                         <Badge variant="secondary" className="text-xs">
@@ -559,7 +557,7 @@ export default function TeacherDocuments() {
                           </div>
                         </td>
                         <td className="p-4">
-                          <Badge variant="outline">{document.category.name}</Badge>
+                          <Badge variant="outline">{document.category?.name || 'Uncategorized'}</Badge>
                         </td>
                         <td className="p-4 text-sm">{formatFileSize(document.fileSize)}</td>
                         <td className="p-4 text-sm">{formatDate(document.createdAt)}</td>
@@ -643,6 +641,16 @@ export default function TeacherDocuments() {
           open={shareDialogOpen}
           onOpenChange={setShareDialogOpen}
           onShare={handleShareSubmit}
+        />
+
+        {/* File Preview Modal */}
+        <FilePreviewModal
+          file={previewFile}
+          isOpen={isPreviewOpen}
+          onClose={() => {
+            setIsPreviewOpen(false);
+            setPreviewFile(null);
+          }}
         />
       </div>
     </Layout>

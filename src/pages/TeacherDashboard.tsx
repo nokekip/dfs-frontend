@@ -7,6 +7,10 @@ import { useDashboard } from '../hooks/useDashboard';
 import Layout from '../components/Layout';
 import { Loading } from '../components/Loading';
 import { ErrorMessage } from '../components/ErrorBoundary';
+import FilePreviewModal from '../components/FilePreviewModal';
+import ShareDialog from '../components/ShareDialog';
+import { config } from '../lib/config';
+import { apiClient } from '../services/api';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -71,6 +75,10 @@ export default function TeacherDashboard() {
     subject: ''
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [previewFile, setPreviewFile] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
 
   // Fetch data on component mount
   useEffect(() => {
@@ -184,40 +192,40 @@ export default function TeacherDashboard() {
   };
 
   const handleView = (file: any) => {
-    // In real app, this would open document in preview modal or new tab
-    toast.info('Opening Preview', {
-      description: `Opening ${file.fileName} in preview`
-    });
-    window.open(`/preview/${file.id}`, '_blank');
+    setPreviewFile(file);
+    setIsPreviewOpen(true);
   };
 
-  const handleDownload = (file: any) => {
-    // In real app, this would trigger actual download
-    toast.success('Download Started', {
-      description: `Downloading ${file.fileName}`
-    });
-    // Simulate download
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = file.fileName;
-    link.click();
-    toast.success('Download Started', {
-      description: `${file.fileName} is being downloaded`
-    });
-  };
-
-  const handleShare = async (file: any) => {
+  const handleDownload = async (file: any) => {
     try {
-      await shareDocument(file.id, true);
-      toast.success('Document Shared', {
-        description: `"${file.title}" has been shared successfully`
+      await apiClient.downloadDocument(file.id);
+      toast.success('Download Started', {
+        description: `${file.fileName} is being downloaded`
       });
-      fetchDocuments(); // Refresh list
     } catch (error) {
-      toast.error('Share Failed', {
-        description: 'Failed to share document. Please try again.'
+      console.error('Download failed:', error);
+      toast.error('Download Failed', {
+        description: 'Failed to download file. Please try again.'
       });
     }
+  };
+
+  const handleShare = (file: any) => {
+    setSelectedDocument(file);
+    setShareDialogOpen(true);
+  };
+
+  const handleShareSuccess = () => {
+    setShareDialogOpen(false);
+    setSelectedDocument(null);
+    
+    // Refresh data
+    fetchDocuments();
+    fetchDashboardStats();
+    
+    toast.success('Document Shared', {
+      description: 'Document has been shared successfully'
+    });
   };
 
   // Loading state
@@ -515,6 +523,22 @@ export default function TeacherDashboard() {
           </Card>
         </div>
       </div>
+      
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewFile(null);
+        }}
+      />
+      
+      <ShareDialog
+        document={selectedDocument}
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        onShare={handleShareSuccess}
+      />
     </Layout>
   );
 }
