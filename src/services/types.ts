@@ -46,6 +46,7 @@ export interface RegisterRequest {
   lastName: string;
   password: string;
   confirmPassword: string;
+  phoneNumber?: string;
 }
 
 export interface OTPVerificationRequest {

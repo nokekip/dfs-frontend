@@ -260,53 +260,68 @@ export class ApiClient {
   }
 
   async register(data: RegisterRequest): Promise<ApiResponse<{ message: string }>> {
-    await delay();
+    try {
+      const response = await fetch(`${config.api.baseUrl}/accounts/teacher-registration/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          first_name: data.firstName,
+          last_name: data.lastName,
+          phone_number: data.phoneNumber || '',
+        }),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
 
-    if (data.password !== data.confirmPassword) {
-      simulateError('Passwords do not match', 400);
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        // Handle validation errors from Django
+        if (response.status === 400) {
+          const errorMessages = [];
+          if (responseData.email) errorMessages.push(`Email: ${Array.isArray(responseData.email) ? responseData.email.join(', ') : responseData.email}`);
+          if (responseData.password) errorMessages.push(`Password: ${Array.isArray(responseData.password) ? responseData.password.join(', ') : responseData.password}`);
+          if (responseData.first_name) errorMessages.push(`First Name: ${Array.isArray(responseData.first_name) ? responseData.first_name.join(', ') : responseData.first_name}`);
+          if (responseData.last_name) errorMessages.push(`Last Name: ${Array.isArray(responseData.last_name) ? responseData.last_name.join(', ') : responseData.last_name}`);
+          if (responseData.non_field_errors) errorMessages.push(Array.isArray(responseData.non_field_errors) ? responseData.non_field_errors.join(', ') : responseData.non_field_errors);
+          
+          const errorMessage = errorMessages.length > 0 ? errorMessages.join('; ') : 'Registration failed';
+          throw new ApiError(errorMessage, 400);
+        }
+        
+        throw new ApiError(
+          responseData.error || 
+          responseData.detail ||
+          'Registration failed',
+          response.status
+        );
+      }
+
+      return {
+        success: true,
+        data: {
+          message: responseData.message || 'Registration successful. Your account is pending admin approval.'
+        }
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred during registration', 500);
     }
-
-    const users = mockDataStore.getUsers();
-    const existingUser = users.find(u => u.email === data.email);
-
-    if (existingUser) {
-      simulateError('Email already registered', 400);
-    }
-
-    const newUser: User = {
-      id: mockDataStore.generateId(),
-      email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      role: 'teacher',
-      isActive: false, // Requires email verification
-      dateJoined: new Date().toISOString(),
-    };
-
-    // Create teacher profile
-    const newTeacher: Teacher = {
-      id: mockDataStore.generateId(),
-      user: newUser,
-      status: 'pending',
-      documentsCount: 0,
-      sharedDocumentsCount: 0,
-      totalDownloads: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    const teachers = mockDataStore.getTeachers();
-    teachers.push(newTeacher);
-
-    mockDataStore.saveUsers(users);
-    mockDataStore.saveTeachers(teachers);
-
-    return {
-      success: true,
-      data: { message: 'Registration successful. Please verify your email with the OTP sent to your inbox.' },
-      message: 'Registration successful',
-    };
   }
 
   async verifyOTP(data: OTPVerificationRequest): Promise<ApiResponse<LoginResponse>> {

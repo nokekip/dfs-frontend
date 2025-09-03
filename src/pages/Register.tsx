@@ -42,17 +42,20 @@ export default function Register() {
     }
 
     try {
-      await register(formData);
-      setSuccess(true);
-      toast.success('Registration Successful', {
-        description: 'Your account has been created and is pending approval'
+      await register({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        password: formData.password,
       });
+      setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -170,7 +173,7 @@ export default function Register() {
 
               {/* Phone Number */}
               <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -181,7 +184,6 @@ export default function Register() {
                     value={formData.phoneNumber}
                     onChange={handleInputChange}
                     className="pl-10"
-                    required
                   />
                 </div>
               </div>

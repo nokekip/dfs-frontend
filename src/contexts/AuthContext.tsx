@@ -19,7 +19,7 @@ interface RegisterData {
   password: string;
   firstName: string;
   lastName: string;
-  phoneNumber: string;
+  phoneNumber?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,6 +55,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       lastName: userData.lastName,
       password: userData.password,
       confirmPassword: userData.password,
+      phoneNumber: userData.phoneNumber,
     });
   };
 
