@@ -50,6 +50,9 @@ interface ProfileData {
   phoneNumber: string;
   bio: string;
   profilePicture?: string;
+  profilePictureFile?: File;
+  profilePicturePreview?: string;
+  removeExistingPicture: boolean;
 }
 
 interface SecuritySettings {
@@ -77,6 +80,9 @@ export default function TeacherSettings() {
     phoneNumber: '+254 712 345 678',
     bio: 'Passionate educator with 8 years of experience in primary education.',
     profilePicture: user?.profilePicture || undefined,
+    profilePictureFile: undefined,
+    profilePicturePreview: undefined,
+    removeExistingPicture: false,
   });
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
@@ -114,13 +120,32 @@ export default function TeacherSettings() {
 
   const handleProfileSave = async () => {
     try {
-      // Update the user in AuthContext with all profile data including profile picture
-      await updateUser({
+      // Prepare update data
+      const updateData: any = {
         firstName: profileData.firstName,
         lastName: profileData.lastName,
         email: profileData.email,
-        profilePicture: profileData.profilePicture,
-      });
+      };
+
+      // Handle profile picture changes
+      if (profileData.profilePictureFile) {
+        // New file selected
+        updateData.profilePictureFile = profileData.profilePictureFile;
+      } else if (profileData.removeExistingPicture) {
+        // User wants to remove existing picture
+        updateData.removeProfilePicture = true;
+      }
+      
+      // Update the user in AuthContext with all profile data including profile picture
+      await updateUser(updateData);
+      
+      // Clear the file and preview after successful upload
+      setProfileData(prev => ({
+        ...prev,
+        profilePictureFile: undefined,
+        profilePicturePreview: undefined,
+        removeExistingPicture: false,
+      }));
       
       toast.success('Profile Updated', {
         description: 'Your profile information has been saved successfully'
@@ -175,52 +200,46 @@ export default function TeacherSettings() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = async (e) => {
+    input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        try {
-          // Create object URL for the image
-          const imageUrl = URL.createObjectURL(file);
-          
-          // Update local state
-          setProfileData(prev => ({ ...prev, profilePicture: imageUrl }));
-          
-          // Update user in AuthContext immediately
-          await updateUser({
-            profilePicture: imageUrl,
+        // Validate file size (2MB limit)
+        if (file.size > 2 * 1024 * 1024) {
+          toast.error('File Too Large', {
+            description: 'Please choose an image smaller than 2MB'
           });
-          
-          toast.success('Photo Updated', {
-            description: 'Profile photo has been updated successfully'
-          });
-        } catch (error) {
-          toast.error('Photo Update Failed', {
-            description: 'Failed to update profile photo. Please try again.'
-          });
+          return;
         }
+
+        // Create preview URL and store the file for later upload
+        const previewUrl = URL.createObjectURL(file);
+        setProfileData(prev => ({
+          ...prev,
+          profilePictureFile: file,
+          profilePicturePreview: previewUrl,
+          removeExistingPicture: false,
+        }));
+        
+        toast.success('Photo Selected', {
+          description: 'Photo selected. Click "Save Profile" to upload it.'
+        });
       }
     };
     input.click();
   };
 
-  const handleRemovePhoto = async () => {
-    try {
-      // Update local state
-      setProfileData(prev => ({ ...prev, profilePicture: undefined }));
-      
-      // Update user in AuthContext immediately
-      await updateUser({
-        profilePicture: undefined,
-      });
-      
-      toast.success('Photo Removed', {
-        description: 'Profile photo has been removed successfully'
-      });
-    } catch (error) {
-      toast.error('Photo Removal Failed', {
-        description: 'Failed to remove profile photo. Please try again.'
-      });
-    }
+  const handleRemovePhoto = () => {
+    // Clear the preview and selected file, and mark for removal
+    setProfileData(prev => ({
+      ...prev,
+      profilePictureFile: undefined,
+      profilePicturePreview: undefined,
+      removeExistingPicture: true,
+    }));
+    
+    toast.success('Photo Removed', {
+      description: 'Photo will be removed when you save your profile.'
+    });
   };
 
   return (
@@ -277,9 +296,16 @@ export default function TeacherSettings() {
                 {/* Profile Picture */}
                 <div className="flex items-center gap-6">
                   <UserAvatar 
-                    user={user} 
+                    key={profileData.profilePicturePreview || profileData.profilePicture || 'no-picture'}
+                    user={{
+                      ...user!,
+                      firstName: profileData.firstName,
+                      lastName: profileData.lastName,
+                      profilePicture: profileData.removeExistingPicture 
+                        ? undefined 
+                        : (profileData.profilePicturePreview || profileData.profilePicture)
+                    }}
                     size="xl" 
-                    key={user?.profilePicture} 
                   />
                   <div className="space-y-2">
                     <div className="flex gap-2">
