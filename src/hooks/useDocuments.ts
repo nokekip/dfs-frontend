@@ -28,6 +28,7 @@ interface DocumentsActions {
   shareDocument: (documentId: string, isShared: boolean) => Promise<boolean>;
   revokeShare: (documentId: string) => Promise<boolean>;
   deleteDocument: (documentId: string) => Promise<boolean>;
+  adminDeleteDocument: (documentId: string) => Promise<boolean>;
   downloadDocument: (documentId: string) => Promise<boolean>;
   flagDocument: (documentId: string) => Promise<boolean>;
   archiveDocument: (documentId: string) => Promise<boolean>;
@@ -328,6 +329,48 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     }
   }, [state.documents]);
 
+  const adminDeleteDocument = useCallback(async (documentId: string): Promise<boolean> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const documentToDelete = state.documents.find(doc => doc.id === documentId);
+      const response = await apiClient.adminDeleteDocument(documentId);
+      
+      if (response.success) {
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.filter(doc => doc.id !== documentId),
+          isLoading: false,
+        }));
+
+        toast.success('Document Deleted', {
+          description: `"${documentToDelete?.title}" has been deleted by admin successfully.`,
+        });
+
+        return true;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof ApiError 
+        ? error.message 
+        : 'Failed to delete document. Please try again.';
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+
+      toast.error('Delete Failed', {
+        description: errorMessage,
+      });
+
+      return false;
+    }
+  }, [state.documents]);
+
   const downloadDocument = useCallback(async (documentId: string): Promise<boolean> => {
     try {
       // Note: This would be implemented when we add the download document endpoint
@@ -482,6 +525,7 @@ export const useDocuments = (initialFilters?: SearchFilters): DocumentsState & D
     shareDocument,
     revokeShare,
     deleteDocument,
+    adminDeleteDocument,
     downloadDocument,
     flagDocument,
     archiveDocument,

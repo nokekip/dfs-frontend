@@ -46,7 +46,7 @@ import { toast } from 'sonner';
 import { getFileIconWithColor, formatFileSize } from '../lib/fileUtils';
 
 export default function AdminDocuments() {
-  const { documents, isLoading, deleteDocument, flagDocument, archiveDocument } = useDocuments();
+  const { documents, isLoading, deleteDocument, adminDeleteDocument, flagDocument, archiveDocument } = useDocuments();
   const { categories } = useCategories();
   const { teachers } = useTeachers();
   const [filteredDocuments, setFilteredDocuments] = useState(documents);
@@ -157,10 +157,10 @@ export default function AdminDocuments() {
   const handleDeleteDocument = async () => {
     if (selectedDocument) {
       try {
-        await deleteDocument(selectedDocument.id);
+        await adminDeleteDocument(selectedDocument.id);
         setDeleteDialogOpen(false);
         setSelectedDocument(null);
-        toast.success('Document deleted successfully!');
+        toast.success('Document deleted successfully by admin!');
       } catch (error) {
         toast.error('Failed to delete document');
       }
@@ -367,7 +367,7 @@ export default function AdminDocuments() {
                           className="text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
+                          Admin Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -438,9 +438,9 @@ export default function AdminDocuments() {
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Document</DialogTitle>
+              <DialogTitle>Admin Delete Document</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "{selectedDocument?.title}"? This action cannot be undone.
+                Are you sure you want to delete "{selectedDocument?.title}" as an administrator? This action cannot be undone and bypasses normal restrictions.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -449,7 +449,7 @@ export default function AdminDocuments() {
               </Button>
               <Button variant="destructive" onClick={handleDeleteDocument}>
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete Document
+                Admin Delete
               </Button>
             </DialogFooter>
           </DialogContent>

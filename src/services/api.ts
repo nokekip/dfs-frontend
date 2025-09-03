@@ -1497,6 +1497,41 @@ export class ApiClient {
     }
   }
 
+  async adminDeleteDocument(documentId: string): Promise<ApiResponse<{ message: string }>> {
+    // This method requires admin role
+    this.requireRole('admin');
+
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/documents/${documentId}/admin-delete/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      return {
+        success: true,
+        data: { message: 'Document deleted by admin successfully' },
+        message: 'Document deleted by admin successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to delete document', 500);
+    }
+  }
+
   async previewDocument(documentId: string, shareToken?: string): Promise<string> {
     try {
       const token = localStorage.getItem(config.auth.tokenKey);
