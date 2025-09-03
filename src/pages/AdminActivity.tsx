@@ -114,6 +114,14 @@ export default function AdminActivity() {
       // Ensure activity and user data is valid
       if (!activity || !activity.user || !activity.user.id) return false;
       
+      // Date range filtering
+      const activityDate = new Date(activity.createdAt);
+      const now = new Date();
+      const daysBack = parseInt(dateRange);
+      const cutoffDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+      
+      const matchesDateRange = activityDate >= cutoffDate;
+      
       const fullUserName = `${activity.user.firstName || ''} ${activity.user.lastName || ''}`.trim();
       const matchesSearch = fullUserName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            activity.targetName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -123,11 +131,11 @@ export default function AdminActivity() {
       const matchesUser = userFilter === 'all' || activity.user.id === userFilter;
       const matchesSeverity = severityFilter === 'all' || activity.severity?.toLowerCase() === severityFilter;
 
-      return matchesSearch && matchesAction && matchesUser && matchesSeverity;
+      return matchesDateRange && matchesSearch && matchesAction && matchesUser && matchesSeverity;
     });
 
     setFilteredActivities(filtered);
-  }, [activities, searchQuery, actionFilter, userFilter, severityFilter]);
+  }, [activities, searchQuery, actionFilter, userFilter, severityFilter, dateRange]);
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -233,6 +241,11 @@ export default function AdminActivity() {
             <h1 className="text-2xl font-bold">Activity Logs</h1>
             <p className="text-muted-foreground">
               Monitor system activities and user actions
+              {dateRange !== '7' && (
+                <span className="ml-2 text-blue-500">
+                  • Showing last {dateRange === '1' ? '24 hours' : `${dateRange} days`}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -259,7 +272,7 @@ export default function AdminActivity() {
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
-                <div className="text-2xl font-bold">{activities.length}</div>
+                <div className="text-2xl font-bold">{filteredActivities.length}</div>
                 <p className="text-xs text-muted-foreground">Total Activities</p>
               </div>
             </CardContent>
@@ -268,7 +281,7 @@ export default function AdminActivity() {
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
                 <div className="text-2xl font-bold text-success">
-                  {activities.filter(a => a.severity.toLowerCase() === 'low').length}
+                  {filteredActivities.filter(a => a.severity.toLowerCase() === 'low').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Low Severity</p>
               </div>
@@ -278,7 +291,7 @@ export default function AdminActivity() {
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
                 <div className="text-2xl font-bold text-warning">
-                  {activities.filter(a => a.severity.toLowerCase() === 'medium').length}
+                  {filteredActivities.filter(a => a.severity.toLowerCase() === 'medium').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Medium Severity</p>
               </div>
@@ -288,7 +301,7 @@ export default function AdminActivity() {
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
                 <div className="text-2xl font-bold text-destructive">
-                  {activities.filter(a => ['high', 'critical'].includes(a.severity.toLowerCase())).length}
+                  {filteredActivities.filter(a => ['high', 'critical'].includes(a.severity.toLowerCase())).length}
                 </div>
                 <p className="text-xs text-muted-foreground">High Severity</p>
               </div>

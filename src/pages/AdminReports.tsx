@@ -185,7 +185,12 @@ export default function AdminReports() {
   // Fetch reports data when component mounts or time range changes
   useEffect(() => {
     fetchReports(timeRange);
-  }, [fetchReports, timeRange]);
+  }, [timeRange]); // Removed fetchReports from dependencies since it's stable
+
+  const handleTimeRangeChange = (value: string) => {
+    setTimeRange(value);
+    // fetchReports will be called automatically by useEffect
+  };
 
   // Loading state
   if (isLoading) {
@@ -391,13 +396,11 @@ export default function AdminReports() {
             <h1 className="text-2xl font-bold">Reports & Analytics</h1>
             <p className="text-muted-foreground">
               System insights and usage analytics
+              {isLoading && <span className="ml-2 text-blue-500">• Loading...</span>}
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Select value={timeRange} onValueChange={(value) => {
-              setTimeRange(value);
-              fetchReports(value);
-            }}>
+            <Select value={timeRange} onValueChange={handleTimeRangeChange} disabled={isLoading}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -408,7 +411,7 @@ export default function AdminReports() {
                 <SelectItem value="365">Last year</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={handleExportReport}>
+            <Button onClick={handleExportReport} disabled={isLoading || !reportsData}>
               <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>
