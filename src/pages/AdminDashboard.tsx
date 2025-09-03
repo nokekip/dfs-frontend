@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTeachers } from '../hooks/useTeachers';
 import { useCategories } from '../hooks/useCategories';
@@ -37,15 +38,7 @@ import {
   Download,
   BarChart3
 } from 'lucide-react';
-import type { Teacher, DocumentCategory } from '../services/types';
-
-interface ActivityLog {
-  id: string;
-  teacherName: string;
-  action: 'upload' | 'delete' | 'share' | 'login';
-  fileName?: string;
-  timestamp: string;
-}
+import type { Teacher, DocumentCategory, ActivityLog, ActivityAction, DashboardStats } from '../services/types';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -69,8 +62,6 @@ export default function AdminDashboard() {
     fetchDashboardStats 
   } = useDashboard('admin');
 
-  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
-  
   // Dialog states
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | null>(null);
@@ -78,35 +69,14 @@ export default function AdminDashboard() {
   const [editCategoryDialogOpen, setEditCategoryDialogOpen] = useState(false);
   const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
 
-  // Fetch data on component mount
+  // Extract recent activity from dashboard stats (limit to 5)
+  const recentActivity = ((stats as DashboardStats)?.recentActivity || []).slice(0, 5);
+
+    // Fetch data on component mount
   useEffect(() => {
     fetchTeachers();
     fetchCategories();
     fetchDashboardStats();
-    
-    // Mock recent activity - in real app, this would come from API
-    setRecentActivity([
-      {
-        id: '1',
-        teacherName: 'Jane Doe',
-        action: 'upload',
-        fileName: 'Mathematics Lesson Plan.pdf',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      },
-      {
-        id: '2',
-        teacherName: 'John Smith',
-        action: 'share',
-        fileName: 'Science Assessment.docx',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-      },
-      {
-        id: '3',
-        teacherName: 'Mary Johnson',
-        action: 'login',
-        timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-      },
-    ]);
   }, [fetchTeachers, fetchCategories, fetchDashboardStats]);
 
   const handleViewReports = () => {
@@ -219,34 +189,45 @@ export default function AdminDashboard() {
     }
   };
 
-  const getActivityIcon = (action: string) => {
-    switch (action) {
-      case 'upload':
-        return <FileText className="h-4 w-4 text-primary" />;
-      case 'share':
-        return <Share className="h-4 w-4 text-info" />;
-      case 'delete':
-        return <Trash2 className="h-4 w-4 text-destructive" />;
-      case 'login':
-        return <UserCheck className="h-4 w-4 text-success" />;
-      default:
-        return <Activity className="h-4 w-4" />;
+  const getActivityIcon = (action: ActivityAction | string) => {
+    // Handle both string actions from backend and ActivityAction enum
+    const actionStr = typeof action === 'string' ? action.toLowerCase() : action;
+    
+    if (actionStr.includes('upload') || actionStr.includes('document_upload')) {
+      return <FileText className="h-4 w-4 text-primary" />;
     }
+    if (actionStr.includes('share') || actionStr.includes('document_share')) {
+      return <Share className="h-4 w-4 text-info" />;
+    }
+    if (actionStr.includes('delete') || actionStr.includes('document_delete')) {
+      return <Trash2 className="h-4 w-4 text-destructive" />;
+    }
+    if (actionStr.includes('login')) {
+      return <UserCheck className="h-4 w-4 text-success" />;
+    }
+    if (actionStr.includes('download') || actionStr.includes('document_download')) {
+      return <Download className="h-4 w-4 text-blue-500" />;
+    }
+    return <Activity className="h-4 w-4" />;
   };
 
   const getActivityDescription = (activity: ActivityLog) => {
-    switch (activity.action) {
-      case 'upload':
-        return `uploaded "${activity.fileName}"`;
-      case 'share':
-        return `shared "${activity.fileName}"`;
-      case 'delete':
-        return `deleted "${activity.fileName}"`;
-      case 'login':
-        return 'logged into the system';
-      default:
-        return activity.action;
+    // Use the description from the backend if available, otherwise format it
+    if (activity.description) {
+      return activity.description;
     }
+    
+    // Fallback to action-based description
+    const actionStr = typeof activity.action === 'string' ? activity.action.toLowerCase() : activity.action;
+    const targetName = activity.targetName || 'item';
+    
+    if (actionStr.includes('upload')) return `uploaded "${targetName}"`;
+    if (actionStr.includes('share')) return `shared "${targetName}"`;
+    if (actionStr.includes('delete')) return `deleted "${targetName}"`;
+    if (actionStr.includes('download')) return `downloaded "${targetName}"`;
+    if (actionStr.includes('login')) return 'logged into the system';
+    
+    return actionStr.replace(/_/g, ' ');
   };
 
   const formatDateTime = (timestamp: string) => {
@@ -355,16 +336,33 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm">
-                        <span className="font-medium">{activity.teacherName}</span>{' '}
+                        <span className="font-medium">
+                          {activity.user?.firstName} {activity.user?.lastName}
+                        </span>{' '}
                         {getActivityDescription(activity)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {formatDateTime(activity.timestamp)}
+                        {formatDateTime(activity.createdAt)}
                       </p>
                     </div>
                   </div>
                 ))}
+                {recentActivity.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No recent activity
+                  </p>
+                )}
               </div>
+              {recentActivity.length > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <Link to="/admin/activity">
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Activity className="h-4 w-4 mr-2" />
+                      View All Activity
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </CardContent>
           </Card>
 

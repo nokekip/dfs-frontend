@@ -2035,33 +2035,98 @@ export class ApiClient {
 
   // Dashboard Methods
   async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
-    await delay();
-
     this.requireRole('admin');
-    const stats = mockDataStore.getDashboardStats();
+    
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    return {
-      success: true,
-      data: stats,
-      message: 'Dashboard stats retrieved successfully',
-    };
+      const response = await fetch(`${config.api.baseUrl}/accounts/dashboard/admin-stats/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+
+      return {
+        success: true,
+        data: data,
+        message: 'Dashboard stats retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('Failed to fetch dashboard stats', 500);
+    }
   }
 
   async getTeacherDashboardStats(): Promise<ApiResponse<TeacherDashboardStats>> {
-    await delay();
-
     const user = this.getCurrentUser();
     if (user.role !== 'teacher') {
-      simulateError('Only teachers can access teacher dashboard stats', 403);
+      throw new ApiError('Only teachers can access teacher dashboard stats', 403);
     }
 
-    const stats = mockDataStore.getTeacherDashboardStats(user.id);
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
 
-    return {
-      success: true,
-      data: stats,
-      message: 'Teacher dashboard stats retrieved successfully',
-    };
+      const response = await fetch(`${config.api.baseUrl}/accounts/dashboard/teacher-stats/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+
+      return {
+        success: true,
+        data: data,
+        message: 'Teacher dashboard stats retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('Failed to fetch teacher dashboard stats', 500);
+    }
   }
 
   // Settings Methods
