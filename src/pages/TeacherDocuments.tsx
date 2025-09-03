@@ -12,6 +12,7 @@ import { useDocuments } from '../hooks/useDocuments';
 import { Document } from '../services/types';
 import { apiClient } from '../services/api';
 import { config } from '../lib/config';
+import { getFileIconWithColor, formatFileSize } from '../lib/fileUtils';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -126,30 +127,12 @@ export default function TeacherDocuments() {
     setFilteredDocuments(filtered);
   }, [documents, searchQuery, selectedCategory, selectedClass, selectedSubject, sortField, sortDirection]);
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image') || fileType === 'JPG' || fileType === 'PNG') {
-      return <Image className="h-6 w-6 text-blue-500" />;
-    }
-    if (fileType === 'PDF') {
-      return <FileText className="h-6 w-6 text-red-500" />;
-    }
-    return <File className="h-6 w-6 text-gray-500" />;
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-KE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const handleSort = (field: SortField) => {
@@ -411,7 +394,7 @@ export default function TeacherDocuments() {
               <Card key={document.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    {getFileIcon(document.fileType)}
+                    {getFileIconWithColor(document.fileType, 'h-6 w-6')}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -542,7 +525,7 @@ export default function TeacherDocuments() {
                       <tr key={document.id} className="border-b hover:bg-muted/50">
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            {getFileIcon(document.fileType)}
+                            {getFileIconWithColor(document.fileType, 'h-6 w-6')}
                             <div>
                               <p className="font-medium">{document.title}</p>
                               <p className="text-xs text-muted-foreground">

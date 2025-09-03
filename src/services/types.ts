@@ -187,6 +187,23 @@ export interface DocumentShare {
   expires_at?: string;
   shared_at: string;
   public_url?: string;
+  // Additional fields from backend serializer
+  shared_by_name?: string;
+  shared_with_name?: string;
+  document_title?: string;
+  document_file_name?: string;
+  document_file_type?: string;
+  document_file_size?: number;
+  document_file_size_mb?: number;
+  document_download_count?: number;
+  document_category_id?: string;
+  document_category_name?: string;
+  document_description?: string;
+  document_class_level?: string;
+  document_subject?: string;
+  document_status?: string;
+  document_created_at?: string;
+  is_expired?: boolean;
 }
 
 // Category types

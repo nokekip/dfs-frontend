@@ -43,6 +43,7 @@ import { useDocuments } from '../hooks/useDocuments';
 import { useCategories } from '../hooks/useCategories';
 import { useTeachers } from '../hooks/useTeachers';
 import { toast } from 'sonner';
+import { getFileIconWithColor, formatFileSize } from '../lib/fileUtils';
 
 export default function AdminDocuments() {
   const { documents, isLoading, deleteDocument, flagDocument, archiveDocument } = useDocuments();
@@ -56,29 +57,6 @@ export default function AdminDocuments() {
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-
-  const getFileIcon = (fileType: string) => {
-    if (!fileType) return <File className="h-5 w-5 text-gray-500" />;
-    
-    const type = fileType.toLowerCase();
-    
-    // Handle file extensions and MIME types for images
-    if (type.includes('image') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(type)) {
-      return <Image className="h-5 w-5 text-green-500" />;
-    }
-    
-    // Handle file extensions and MIME types for PDFs
-    if (type.includes('pdf') || type === 'pdf') {
-      return <FileText className="h-5 w-5 text-red-500" />;
-    }
-    
-    // Handle file extensions and MIME types for documents
-    if (type.includes('document') || type.includes('word') || ['doc', 'docx'].includes(type)) {
-      return <FileText className="h-5 w-5 text-blue-600" />;
-    }
-    
-    return <File className="h-5 w-5 text-gray-500" />;
-  };
 
   // Initialize filtered documents when documents change
   useEffect(() => {
@@ -318,7 +296,7 @@ export default function AdminDocuments() {
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      {getFileIcon(document.fileType)}
+                      {getFileIconWithColor(document.fileType)}
                       <Badge variant="outline" className="text-xs">
                         {getFileTypeDisplay(document.fileType)}
                       </Badge>
@@ -409,7 +387,7 @@ export default function AdminDocuments() {
             {selectedDocument && (
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  {getFileIcon(selectedDocument.fileType)}
+                  {getFileIconWithColor(selectedDocument.fileType, 'h-8 w-8')}
                   <div>
                     <h3 className="text-lg font-semibold">{selectedDocument.title}</h3>
                     <p className="text-muted-foreground">{selectedDocument.fileName}</p>

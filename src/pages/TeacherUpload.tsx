@@ -29,6 +29,7 @@ import {
 import { useCategories } from '../hooks/useCategories';
 import { useDocuments } from '../hooks/useDocuments';
 import { useSystemSettings } from '../hooks/useSystemSettings';
+import { getFileIconWithColor, formatFileSize } from '../lib/fileUtils';
 
 interface UploadFile {
   id: string;
@@ -55,20 +56,6 @@ export default function TeacherUpload() {
   // Get allowed file types and max file size from system settings
   const allowedFileTypes = settings?.allowedFileTypes || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
   const maxFileSize = (settings?.maxFileSize || 10) * 1024 * 1024; // Convert MB to bytes
-
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image')) return <Image className="h-6 w-6" />;
-    if (fileType.includes('pdf')) return <FileText className="h-6 w-6" />;
-    return <File className="h-6 w-6" />;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   const getFileTypeFromExtension = (fileName: string): string => {
     const extension = fileName.split('.').pop()?.toLowerCase() || '';
@@ -368,7 +355,7 @@ export default function TeacherUpload() {
                       {/* File Header */}
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          {getFileIcon(fileData.file.type)}
+                          {getFileIconWithColor(getFileTypeFromExtension(fileData.file.name), 'h-6 w-6')}
                           <div>
                             <p className="font-medium">{fileData.file.name}</p>
                             <p className="text-sm text-muted-foreground">

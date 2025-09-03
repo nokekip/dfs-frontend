@@ -1382,6 +1382,73 @@ export class ApiClient {
     }
   }
 
+  async getDocumentShares(): Promise<ApiResponse<DocumentShare[]>> {
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/documents/shares/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+      
+      // Convert backend response to frontend DocumentShare interface
+      const shares: DocumentShare[] = data.map((share: any) => ({
+        id: share.id,
+        document: share.document,
+        shared_by: share.shared_by,
+        shared_with: share.shared_with,
+        share_type: share.share_type,
+        share_token: share.share_token,
+        can_download: share.can_download,
+        can_view: share.can_view,
+        is_active: share.is_active,
+        expires_at: share.expires_at,
+        shared_at: share.shared_at,
+        public_url: share.public_url,
+        // Additional fields from serializer
+        shared_by_name: share.shared_by_name,
+        shared_with_name: share.shared_with_name,
+        document_title: share.document_title,
+        document_file_name: share.document_file_name,
+        document_file_type: share.document_file_type,
+        document_file_size: share.document_file_size,
+        document_file_size_mb: share.document_file_size_mb,
+        document_download_count: share.document_download_count,
+        document_category_id: share.document_category_id,
+        document_category_name: share.document_category_name,
+        document_description: share.document_description,
+        document_class_level: share.document_class_level,
+        document_subject: share.document_subject,
+        document_status: share.document_status,
+        document_created_at: share.document_created_at,
+        is_expired: share.is_expired,
+      }));
+
+      return {
+        success: true,
+        data: shares,
+        message: 'Document shares retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch document shares', 500);
+    }
+  }
+
   async deleteDocument(documentId: string): Promise<ApiResponse<{ message: string }>> {
     try {
       const token = localStorage.getItem(config.auth.tokenKey);

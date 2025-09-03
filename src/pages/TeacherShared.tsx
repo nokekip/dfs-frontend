@@ -46,13 +46,14 @@ import {
   UserPlus,
   Trash2
 } from 'lucide-react';
-import { useDocuments } from '../hooks/useDocuments';
+import { useDocumentShares } from '../hooks/useDocumentShares';
 import { useAuth } from '../contexts/AuthContext';
 import { useCategories } from '../hooks/useCategories';
+import { formatFileSize, getFileIconWithColor } from '../lib/fileUtils';
 
 export default function TeacherShared() {
   const { user } = useAuth();
-  const { documents, isLoading, shareDocument, revokeShare } = useDocuments();
+  const { shares, sharedWithMe, mySharedFiles, isLoading, refresh } = useDocumentShares();
   const { categories } = useCategories();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -62,32 +63,22 @@ export default function TeacherShared() {
   const [previewFile, setPreviewFile] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  // Filter documents shared with me and shared by me
-  const sharedWithMe = documents.filter(doc => 
-    doc.sharedWith?.includes(user?.id || '') && doc.teacher?.user?.id !== user?.id
-  );
-  
-  const mySharedFiles = documents.filter(doc => 
-    doc.teacher?.user?.id === user?.id && doc.sharedWith && doc.sharedWith.length > 0
-  );
+  // Filter functions for search and category
+  const filteredSharedWithMe = sharedWithMe.filter(share => {
+    const matchesSearch = share.document_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         share.shared_by_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         share.document_description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || share.document_category_id === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image') || fileType === 'JPG' || fileType === 'PNG') {
-      return <Image className="h-5 w-5 text-blue-500" />;
-    }
-    if (fileType === 'PDF') {
-      return <FileText className="h-5 w-5 text-red-500" />;
-    }
-    return <File className="h-5 w-5 text-gray-500" />;
-  };
+  const filteredMyShared = mySharedFiles.filter(share => {
+    const matchesSearch = share.document_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         share.shared_with_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         share.document_description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || share.document_category_id === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-KE', {
@@ -130,7 +121,8 @@ export default function TeacherShared() {
   const handleShareSubmit = async (shareData: any) => {
     if (selectedDocument) {
       try {
-        await shareDocument(selectedDocument.id, shareData);
+        // Use the document share API
+        await apiClient.shareDocument(selectedDocument.id, shareData);
         
         let message = `Document "${selectedDocument.title}" shared successfully!`;
         
@@ -138,15 +130,18 @@ export default function TeacherShared() {
           message += `\nPublic link: ${shareData.publicLink}`;
         }
 
-        if (shareData.emails.length > 0) {
+        if (shareData.emails && shareData.emails.length > 0) {
           message += `\nShared with: ${shareData.emails.join(', ')}`;
         }
 
         toast.success('Document Shared Successfully', {
           description: shareData.isPublic
-            ? `Public link created and ${shareData.emails.length > 0 ? `shared with ${shareData.emails.length} people` : 'ready to share'}`
-            : `Shared with ${shareData.emails.join(', ')}`
+            ? `Public link created and ${shareData.emails?.length > 0 ? `shared with ${shareData.emails.length} people` : 'ready to share'}`
+            : `Shared with ${shareData.emails?.join(', ') || 'selected users'}`
         });
+        
+        // Refresh the shares list
+        refresh();
         setSelectedDocument(null);
       } catch (error) {
         toast.error('Failed to share document');
@@ -162,29 +157,17 @@ export default function TeacherShared() {
   const confirmRevoke = async () => {
     if (selectedDocument) {
       try {
-        await revokeShare(selectedDocument.id);
+        await apiClient.unshareDocument(selectedDocument.id);
         setRevokeDialogOpen(false);
         setSelectedDocument(null);
+        // Refresh the shares list
+        refresh();
         toast.success('Sharing stopped successfully');
       } catch (error) {
         toast.error('Failed to stop sharing');
       }
     }
   };
-
-  const filteredSharedWithMe = sharedWithMe.filter(doc => {
-    const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category.id === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const filteredMyShared = mySharedFiles.filter(doc => {
-    const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.category.id === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
 
   const getCategoryName = (categoryId: string) => {
     const category = categories.find(cat => cat.id === categoryId);
@@ -206,20 +189,20 @@ export default function TeacherShared() {
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold">{sharedWithMe.length}</div>
+              <div className="text-2xl font-bold">{filteredSharedWithMe.length}</div>
               <p className="text-xs text-muted-foreground">Files Shared With Me</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="text-2xl font-bold">{mySharedFiles.length}</div>
+              <div className="text-2xl font-bold">{filteredMyShared.length}</div>
               <p className="text-xs text-muted-foreground">Files I've Shared</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {mySharedFiles.reduce((sum, doc) => sum + (doc.sharedWith?.length || 0), 0)}
+                {mySharedFiles.length}
               </div>
               <p className="text-xs text-muted-foreground">Total Collaborators</p>
             </CardContent>
@@ -227,7 +210,7 @@ export default function TeacherShared() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {mySharedFiles.reduce((sum, doc) => sum + (doc.downloadCount || 0), 0)}
+                {mySharedFiles.reduce((sum, share) => sum + (share.documentDetails?.downloadCount || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">Total Downloads</p>
             </CardContent>
@@ -287,87 +270,96 @@ export default function TeacherShared() {
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredSharedWithMe.map((document) => (
-                  <Card key={document.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        {/* File Header */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            {getFileIcon(document.fileType)}
-                            <Badge variant="outline" className="text-xs">
-                              {document.fileType}
-                            </Badge>
+                {filteredSharedWithMe.map((share) => {
+                  const document = share.documentDetails;
+                  if (!document) return null;
+                  
+                  return (
+                    <Card key={share.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* File Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              {getFileIconWithColor(share.document_file_type || 'unknown')}
+                              <Badge variant="outline" className="text-xs">
+                                {share.document_file_type || 'unknown'}
+                              </Badge>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {share.can_download && (
+                                  <DropdownMenuItem onClick={() => handleDownload(share)}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                  </DropdownMenuItem>
+                                )}
+                                {share.can_view && (
+                                  <DropdownMenuItem onClick={() => handlePreview(share)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Preview
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleDownload(document)}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handlePreview(document)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                Preview
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
 
-                        {/* File Details */}
-                        <div>
-                          <h3 className="font-medium line-clamp-2 mb-1">{document.title}</h3>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {document.description || document.fileName}
-                          </p>
-                        </div>
-
-                        {/* Shared By */}
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {document.teacher.user.firstName[0]}{document.teacher.user.lastName[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-sm">
-                            <p className="font-medium">{document.teacher.user.firstName} {document.teacher.user.lastName}</p>
-                            <p className="text-muted-foreground text-xs">
-                              Shared {formatDate(document.sharedAt || document.createdAt)}
+                          {/* File Details */}
+                          <div>
+                            <h3 className="font-medium line-clamp-2 mb-1">{share.document_title}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {share.document_description || share.document_file_name}
                             </p>
                           </div>
-                        </div>
 
-                        {/* Category and Class/Subject */}
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {document.category.name}
-                          </Badge>
-                          {document.classLevel && document.subject && (
-                            <Badge variant="outline" className="text-xs">
-                              {document.classLevel} - {document.subject}
+                          {/* Shared By */}
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {document.teacher.user.firstName[0]}{document.teacher.user.lastName[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="text-sm">
+                              <p className="font-medium">{share.shared_by_name || `${document.teacher.user.firstName} ${document.teacher.user.lastName}`}</p>
+                              <p className="text-muted-foreground text-xs">
+                                Shared {formatDate(share.shared_at)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Category and Class/Subject */}
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {document.category.name}
                             </Badge>
-                          )}
-                        </div>
+                            {document.classLevel && document.subject && (
+                              <Badge variant="outline" className="text-xs">
+                                {document.classLevel} - {document.subject}
+                              </Badge>
+                            )}
+                          </div>
 
-                        {/* File Info */}
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{formatFileSize(document.fileSize)}</span>
-                          <span>{document.downloadCount} downloads</span>
-                        </div>
+                          {/* File Info */}
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{formatFileSize(document.fileSize)}</span>
+                            <span>{document.downloadCount} downloads</span>
+                          </div>
 
-                        {/* Access Status */}
-                        <div className="flex items-center gap-2 text-xs text-success">
-                          <CheckCircle className="h-3 w-3" />
-                          <span>Access granted</span>
+                          {/* Access Status */}
+                          <div className="flex items-center gap-2 text-xs text-success">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Access granted</span>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -392,108 +384,113 @@ export default function TeacherShared() {
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredMyShared.map((document) => (
-                  <Card key={document.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        {/* File Header */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            {getFileIcon(document.fileType)}
-                            <Badge variant="outline" className="text-xs">
-                              {document.fileType}
-                            </Badge>
+                {filteredMyShared.map((share) => {
+                  const document = share.documentDetails;
+                  if (!document) return null;
+                  
+                  return (
+                    <Card key={share.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* File Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              {getFileIconWithColor(share.document_file_type || 'unknown')}
+                              <Badge variant="outline" className="text-xs">
+                                {share.document_file_type || 'unknown'}
+                              </Badge>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleShareMore(document)}>
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Share with More
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copy Share Link
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownload(document)}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handlePreview(document)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Preview
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleRevokeAccess(document)}
+                                  className="text-destructive"
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Stop Sharing
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleShareMore(document)}>
-                                <UserPlus className="h-4 w-4 mr-2" />
-                                Share with More
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy Share Link
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDownload(document)}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handlePreview(document)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                Preview
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleRevokeAccess(document)}
-                                className="text-destructive"
-                              >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Stop Sharing
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
 
-                        {/* File Details */}
-                        <div>
-                          <h3 className="font-medium line-clamp-2 mb-1">{document.title}</h3>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {document.description || document.fileName}
-                          </p>
-                        </div>
-
-                        {/* Category and Class/Subject */}
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {document.category.name}
-                          </Badge>
-                          {document.classLevel && document.subject && (
-                            <Badge variant="outline" className="text-xs">
-                              {document.classLevel} - {document.subject}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Shared With */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">
-                              Shared with {document.sharedWith.length} teacher{document.sharedWith.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">
-                              Shared {formatDate(document.sharedAt || document.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="grid grid-cols-2 gap-4 text-center p-2 bg-muted/50 rounded-lg">
+                          {/* File Details */}
                           <div>
-                            <div className="text-lg font-semibold">{document.sharedWith.length}</div>
-                            <div className="text-xs text-muted-foreground">Shared</div>
+                            <h3 className="font-medium line-clamp-2 mb-1">{share.document_title}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {share.document_description || share.document_file_name}
+                            </p>
                           </div>
-                          <div>
-                            <div className="text-lg font-semibold">{document.downloadCount}</div>
-                            <div className="text-xs text-muted-foreground">Downloads</div>
-                          </div>
-                        </div>
 
-                        {/* File Info */}
-                        <div className="text-xs text-muted-foreground text-center">
-                          {formatFileSize(document.fileSize)}
+                          {/* Category and Class/Subject */}
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {document.category.name}
+                            </Badge>
+                            {document.classLevel && document.subject && (
+                              <Badge variant="outline" className="text-xs">
+                                {document.classLevel} - {document.subject}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Shared With */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">
+                                Shared with {share.shared_with_name || 'Public'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">
+                                Shared {formatDate(share.shared_at)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Stats */}
+                          <div className="grid grid-cols-2 gap-4 text-center p-2 bg-muted/50 rounded-lg">
+                            <div>
+                              <div className="text-lg font-semibold">1</div>
+                              <div className="text-xs text-muted-foreground">Shared</div>
+                            </div>
+                            <div>
+                              <div className="text-lg font-semibold">{document.downloadCount}</div>
+                              <div className="text-xs text-muted-foreground">Downloads</div>
+                            </div>
+                          </div>
+
+                          {/* File Info */}
+                          <div className="text-xs text-muted-foreground text-center">
+                            {formatFileSize(document.fileSize)}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
