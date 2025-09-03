@@ -167,9 +167,11 @@ export interface DocumentUpdateRequest {
 export interface DocumentShareRequest {
   share_type: 'public' | 'private';
   shared_with?: string; // Teacher ID for private shares
+  shared_with_emails?: string[]; // Teacher emails for multiple private shares
   can_download?: boolean;
   can_view?: boolean;
   expires_at?: string; // ISO date string
+  message?: string; // Optional message to include with the share
 }
 
 export interface DocumentShare {

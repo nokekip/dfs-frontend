@@ -42,6 +42,8 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
   const [publicLink, setPublicLink] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isUnsharing, setIsUnsharing] = useState(false);
+  const [hasCreatedShare, setHasCreatedShare] = useState(false);
 
   // Reset form when dialog opens/closes or document changes
   useEffect(() => {
@@ -53,6 +55,8 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
       setPublicLink('');
       setCopySuccess(false);
       setIsSharing(false);
+      setIsUnsharing(false);
+      setHasCreatedShare(false);
     }
   }, [open, document]);
 
@@ -118,20 +122,41 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
           toast.success('Public Link Created', {
             description: 'Document is now publicly accessible via the link'
           });
+          
+          // Mark that we created a share, but don't call onShare yet
+          setHasCreatedShare(true);
         }
       }
       
       // Handle private shares (emails)
-      for (const email of emails) {
-        // In a real implementation, you'd resolve email to teacher ID
-        // For now, we'll skip this or you could add a teacher search API
-        toast.info('Private sharing not yet implemented', {
-          description: 'Email-based sharing will be available soon'
-        });
-      }
-      
-      if (onShare) {
-        onShare();
+      if (emails.length > 0) {
+        const shareRequest: DocumentShareRequest = {
+          share_type: 'private',
+          shared_with_emails: emails,
+          can_download: true,
+          can_view: true,
+          message: message.trim() || undefined,
+        };
+        
+        const response = await apiClient.shareDocument(document.id, shareRequest);
+        
+        if (response.success) {
+          toast.success('Document Shared', {
+            description: `Document shared with ${emails.length} ${emails.length === 1 ? 'person' : 'people'}`
+          });
+          
+          // Clear the email list and message after successful share
+          setEmails([]);
+          setMessage('');
+          
+          // Mark that we created a share
+          setHasCreatedShare(true);
+          
+          // For email shares, we can call onShare since user doesn't need to copy anything
+          if (onShare) {
+            onShare();
+          }
+        }
       }
       
     } catch (error) {
@@ -146,7 +171,7 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
   const handleUnshare = async () => {
     if (!document) return;
     
-    setIsSharing(true);
+    setIsUnsharing(true);
     
     try {
       const response = await apiClient.unshareDocument(document.id);
@@ -170,11 +195,16 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
         description: 'Failed to unshare document. Please try again.'
       });
     } finally {
-      setIsSharing(false);
+      setIsUnsharing(false);
     }
   };
 
   const handleOpenChange = (newOpen: boolean) => {
+    // If closing and we created a share, refresh the parent
+    if (!newOpen && hasCreatedShare && onShare) {
+      onShare();
+    }
+    
     onOpenChange(newOpen);
     if (!newOpen) {
       // Reset form when closing
@@ -184,6 +214,9 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
       setMessage('');
       setPublicLink('');
       setCopySuccess(false);
+      setIsSharing(false);
+      setIsUnsharing(false);
+      setHasCreatedShare(false);
     }
   };
 
@@ -191,7 +224,7 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share className="h-5 w-5" />
@@ -328,8 +361,8 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => handleOpenChange(false)} className="sm:order-1">
             Cancel
           </Button>
           
@@ -337,22 +370,25 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
           {document.isShared && (
             <Button 
               variant="destructive"
+              size="sm"
               onClick={handleUnshare}
-              disabled={isSharing}
+              disabled={isUnsharing}
+              className="sm:order-2"
             >
-              <X className="h-4 w-4 mr-2" />
-              {isSharing ? 'Unsharing...' : 'Unshare Document'}
+              <X className="h-4 w-4 mr-1" />
+              {isUnsharing ? 'Unsharing...' : 'Unshare'}
             </Button>
           )}
           
           <Button 
             onClick={handleShare}
             disabled={(!isPublic && emails.length === 0) || isSharing}
+            className="sm:order-3"
           >
             <Share className="h-4 w-4 mr-2" />
-            {isSharing ? 'Creating Share...' : 
-             isPublic && !publicLink ? 'Generate Public Link' : 
-             'Share Document'}
+            {isSharing ? 'Creating...' : 
+             isPublic && !publicLink ? 'Generate Link' : 
+             'Share'}
           </Button>
         </DialogFooter>
       </DialogContent>
