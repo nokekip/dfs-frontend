@@ -24,38 +24,109 @@ import {
 
 // Helper functions for report generation
 const generateDocumentReportCSV = (data: any) => {
-  const headers = ['Category', 'Document Count', 'Percentage', 'Storage Used'];
-  const rows = data.documentsByCategory.map((cat: any) => [
-    cat.name,
-    cat.count,
-    `${cat.percentage}%`,
-    `${(cat.percentage / 100 * data.storageUsed).toFixed(2)} GB`
-  ]);
-
-  return [headers, ...rows].map(row => row.join(',')).join('\n');
+  let csvContent = `Document Usage Analysis Report\n`;
+  csvContent += `Generated: ${new Date(data.generatedDate).toLocaleString()}\n\n`;
+  
+  csvContent += `SUMMARY\n`;
+  csvContent += `Total Documents,${data.totalDocuments}\n`;
+  csvContent += `Total Storage,${data.storageBreakdown.totalStorage}\n`;
+  csvContent += `Average File Size,${data.storageBreakdown.averageFileSize}\n\n`;
+  
+  csvContent += `DOCUMENTS BY CATEGORY\n`;
+  csvContent += `Category,Document Count,Percentage\n`;
+  data.documentsByCategory.forEach((cat: any) => {
+    csvContent += `${cat.name},${cat.count},${cat.percentage}%\n`;
+  });
+  
+  csvContent += `\nMONTHLY UPLOAD TRENDS\n`;
+  csvContent += `Month,Uploads\n`;
+  data.uploadTrends.forEach((month: any) => {
+    csvContent += `${month.month},${month.uploads}\n`;
+  });
+  
+  if (data.storageByFileType && data.storageByFileType.length > 0) {
+    csvContent += `\nSTORAGE BY FILE TYPE\n`;
+    csvContent += `File Type,Storage Used (GB),Percentage\n`;
+    data.storageByFileType.forEach((item: any) => {
+      csvContent += `${item.fileType},${item.usage},${item.percentage}%\n`;
+    });
+  }
+  
+  if (data.topDocuments && data.topDocuments.length > 0) {
+    csvContent += `\nTOP DOWNLOADED DOCUMENTS\n`;
+    csvContent += `Title,Downloads,Category,Uploaded By\n`;
+    data.topDocuments.forEach((doc: any) => {
+      csvContent += `"${doc.title}",${doc.downloadCount},${doc.category},${doc.teacher}\n`;
+    });
+  }
+  
+  return csvContent;
 };
 
 const generateActivityReportCSV = (data: any) => {
-  const headers = ['Teacher Name', 'Uploads', 'Downloads', 'Status'];
-  const rows = data.topContributors.map((teacher: any) => [
-    teacher.name,
-    teacher.uploads,
-    teacher.downloads,
-    'Active'
-  ]);
-
-  return [headers, ...rows].map(row => row.join(',')).join('\n');
+  let csvContent = `Teacher Engagement Report\n`;
+  csvContent += `Generated: ${new Date(data.generatedDate).toLocaleString()}\n\n`;
+  
+  csvContent += `SUMMARY\n`;
+  csvContent += `Total Teachers,${data.totalUsers}\n`;
+  csvContent += `Active Teachers,${data.activeUsers}\n`;
+  csvContent += `Teacher Activity Change,${data.engagementMetrics.usersChange}%\n`;
+  csvContent += `Average Logins Per User,${data.engagementMetrics.avgLoginsPerUser?.toFixed(1) || 0}\n`;
+  csvContent += `Average Uploads Per Teacher,${data.engagementMetrics.avgUploadsPerTeacher?.toFixed(1) || 0}\n`;
+  csvContent += `Average Downloads Per Teacher,${data.engagementMetrics.avgDownloadsPerTeacher?.toFixed(1) || 0}\n`;
+  
+  // Add login frequency data if available
+  if (data.loginFrequency && data.loginFrequency.length > 0) {
+    csvContent += `\nLOGIN FREQUENCY PATTERNS\n`;
+    csvContent += `Period,Login Count,Percentage\n`;
+    data.loginFrequency.forEach((item: any) => {
+      csvContent += `${item.period},${item.count},${item.percentage}%\n`;
+    });
+  }
+  
+  csvContent += `\nTOP CONTRIBUTORS\n`;
+  csvContent += `Teacher Name,Uploads,Downloads\n`;
+  data.topContributors.forEach((teacher: any) => {
+    csvContent += `${teacher.name},${teacher.uploads},${teacher.downloads}\n`;
+  });
+  
+  return csvContent;
 };
 
 const generateStorageReportCSV = (data: any) => {
-  const headers = ['Category', 'Storage Used', 'Percentage'];
-  const rows = data.storageByCategory.map((item: any) => [
-    item.category,
-    item.usage,
-    `${item.percentage}%`
-  ]);
-
-  return [headers, ...rows].map(row => row.join(',')).join('\n');
+  let csvContent = `Storage Usage & Capacity Report\n`;
+  csvContent += `Generated: ${new Date(data.generatedDate).toLocaleString()}\n\n`;
+  
+  csvContent += `SUMMARY\n`;
+  csvContent += `Current Storage Usage,${data.currentUsage}\n`;
+  csvContent += `Total Storage Capacity,${data.totalCapacity}\n`;
+  csvContent += `Usage Percentage,${data.usagePercentage}%\n\n`;
+  
+  csvContent += `PROJECTED USAGE\n`;
+  csvContent += `Next Month,${data.projectedUsage.nextMonth}\n`;
+  csvContent += `Next 3 Months,${data.projectedUsage.next3Months}\n`;
+  csvContent += `Next 6 Months,${data.projectedUsage.next6Months}\n\n`;
+  
+  csvContent += `STORAGE BY CATEGORY/TYPE\n`;
+  csvContent += `Category,Storage Used,Percentage\n`;
+  data.storageByCategory.forEach((item: any) => {
+    csvContent += `${item.category},${item.usage},${item.percentage}%\n`;
+  });
+  
+  if (data.topDocuments && data.topDocuments.length > 0) {
+    csvContent += `\nLARGEST DOCUMENTS BY DOWNLOADS\n`;
+    csvContent += `Document,Downloads,Category,Uploaded By\n`;
+    data.topDocuments.forEach((doc: any) => {
+      csvContent += `"${doc.title}",${doc.downloadCount},${doc.category},${doc.teacher}\n`;
+    });
+  }
+  
+  csvContent += `\nRECOMMENDATIONS\n`;
+  data.recommendations.forEach((rec: string) => {
+    csvContent += `${rec}\n`;
+  });
+  
+  return csvContent;
 };
 
 const generateComprehensiveReportCSV = (data: any) => {
@@ -82,6 +153,12 @@ const generateComprehensiveReportCSV = (data: any) => {
   csvContent += `Teacher Name,Uploads,Downloads\n`;
   data.topUsers.forEach((user: any) => {
     csvContent += `${user.name},${user.uploads},${user.downloads}\n`;
+  });
+
+  csvContent += `\nMONTHLY UPLOADS\n`;
+  csvContent += `Month,Uploads\n`;
+  data.uploads.forEach((month: any) => {
+    csvContent += `${month.month},${month.uploads}\n`;
   });
 
   return csvContent;
@@ -143,7 +220,15 @@ export default function AdminReports() {
   };
 
   const handleDocumentReport = () => {
-    // Generate and download detailed document usage report
+    // Use real data from the API for document report
+    if (!reportsData) {
+      toast.error('No report data available', {
+        description: 'Please try again later or contact your administrator'
+      });
+      return;
+    }
+
+    // Generate and download detailed document usage report using actual data
     const reportData = {
       reportType: 'Document Usage Analysis',
       generatedDate: new Date().toISOString(),
@@ -152,13 +237,11 @@ export default function AdminReports() {
       uploadTrends: analytics.monthlyUploads,
       storageBreakdown: {
         totalStorage: `${analytics.storageUsed} GB`,
-        averageFileSize: '2.1 MB',
-        largestFiles: [
-          { name: 'Complete Mathematics Curriculum.pdf', size: '15.2 MB', teacher: 'Jane Mwangi' },
-          { name: 'Annual Assessment Report.xlsx', size: '12.8 MB', teacher: 'John Kiprotich' },
-          { name: 'Student Progress Database.csv', size: '8.4 MB', teacher: 'Mary Ochieng' }
-        ]
-      }
+        averageFileSize: ((analytics.storageUsed * 1024) / (analytics.totalDocuments || 1)).toFixed(2) + ' MB', // Calculate average
+      },
+      // Use the new detailed data
+      storageByFileType: analytics.storageByFileType || [],
+      topDocuments: analytics.topDocuments || []
     };
 
     // Create and download CSV report
@@ -171,7 +254,15 @@ export default function AdminReports() {
   };
 
   const handleUserActivityReport = () => {
-    // Generate teacher engagement and activity report
+    // Use real data from the API for user activity report
+    if (!reportsData) {
+      toast.error('No report data available', {
+        description: 'Please try again later or contact your administrator'
+      });
+      return;
+    }
+
+    // Generate teacher engagement and activity report with actual data
     const activityData = {
       reportType: 'Teacher Engagement Report',
       generatedDate: new Date().toISOString(),
@@ -179,16 +270,13 @@ export default function AdminReports() {
       activeUsers: analytics.activeUsers,
       topContributors: analytics.topUploaders,
       engagementMetrics: {
-        avgLoginsPerMonth: 18.5,
-        avgUploadsPerTeacher: 12.3,
-        avgDownloadsPerTeacher: 67.2,
-        mostActiveDay: 'Wednesday',
-        peakActivityHour: '10:00 AM'
+        usersChange: analytics.usersChange || 0,
+        avgLoginsPerUser: analytics.activityMetrics?.avgLoginsPerUser || 0,
+        avgUploadsPerTeacher: analytics.activityMetrics?.avgUploadsPerTeacher || 0,
+        avgDownloadsPerTeacher: analytics.activityMetrics?.avgDownloadsPerTeacher || 0
       },
-      inactiveUsers: [
-        { name: 'Peter Kamau', lastLogin: '2024-01-05', status: 'Inactive for 10+ days' },
-        { name: 'Grace Njeri', lastLogin: '2024-01-08', status: 'Inactive for 7+ days' }
-      ]
+      // Include login frequency patterns
+      loginFrequency: analytics.loginFrequency || []
     };
 
     const csvContent = generateActivityReportCSV(activityData);
@@ -200,6 +288,14 @@ export default function AdminReports() {
   };
 
   const handleExportReport = () => {
+    // Use real data from the API for comprehensive report
+    if (!reportsData) {
+      toast.error('No report data available', {
+        description: 'Please try again later or contact your administrator'
+      });
+      return;
+    }
+
     // Generate comprehensive report based on current time range and analytics
     const reportData = {
       reportType: 'Comprehensive Analytics Report',
@@ -226,29 +322,55 @@ export default function AdminReports() {
   };
 
   const handleStorageReport = () => {
+    // Use real data from the API for storage report
+    if (!reportsData) {
+      toast.error('No report data available', {
+        description: 'Please try again later or contact your administrator'
+      });
+      return;
+    }
+
+    // Use the new storage by file type data if available
+    const storageByCategory = analytics.storageByFileType ? 
+      analytics.storageByFileType.map(item => ({
+        category: item.fileType,
+        usage: `${item.usage} GB`,
+        percentage: item.percentage
+      })) :
+      // Fallback to category-based calculation if storage by file type is not available
+      analytics.popularCategories.map(category => {
+        // Calculate estimated storage used by this category
+        const categoryStoragePercentage = category.percentage;
+        const categoryStorageGB = (categoryStoragePercentage / 100 * analytics.storageUsed).toFixed(2);
+        
+        return {
+          category: category.name,
+          usage: `${categoryStorageGB} GB`,
+          percentage: categoryStoragePercentage
+        };
+      });
+
     // Generate storage usage and capacity planning report
     const storageData = {
       reportType: 'Storage Usage & Capacity Report',
       generatedDate: new Date().toISOString(),
       currentUsage: `${analytics.storageUsed} GB`,
-      totalCapacity: '10 GB',
+      totalCapacity: '10 GB', // This could come from system settings
       usagePercentage: Math.round((analytics.storageUsed / 10) * 100),
       projectedUsage: {
-        nextMonth: '2.8 GB',
-        next3Months: '3.5 GB',
-        next6Months: '4.2 GB'
+        // Simple projection based on current growth rate
+        nextMonth: `${(analytics.storageUsed * (1 + (analytics.storageChange || 0) / 100)).toFixed(2)} GB`,
+        next3Months: `${(analytics.storageUsed * (1 + (analytics.storageChange || 0) / 100 * 3)).toFixed(2)} GB`,
+        next6Months: `${(analytics.storageUsed * (1 + (analytics.storageChange || 0) / 100 * 6)).toFixed(2)} GB`
       },
-      storageByCategory: [
-        { category: 'Lesson Plans', usage: '0.8 GB', percentage: 33 },
-        { category: 'Assessment Reports', usage: '0.6 GB', percentage: 25 },
-        { category: 'Student Records', usage: '0.5 GB', percentage: 21 },
-        { category: 'Administrative Forms', usage: '0.3 GB', percentage: 13 },
-        { category: 'Others', usage: '0.2 GB', percentage: 8 }
-      ],
+      storageByCategory: storageByCategory,
+      topDocuments: analytics.topDocuments || [],
       recommendations: [
-        'Consider upgrading storage plan within 6 months',
+        analytics.storageUsed > 8 ? 'Urgent: Upgrade storage plan immediately' : 
+        analytics.storageUsed > 5 ? 'Consider upgrading storage plan within 3 months' : 
+        'Current storage capacity is sufficient',
         'Implement file compression for older documents',
-        'Archive documents older than 2 years to cold storage'
+        'Archive documents older than 1 year to save space'
       ]
     };
 
@@ -415,6 +537,45 @@ export default function AdminReports() {
           </Card>
         </div>
 
+        {/* Storage By File Type */}
+        {analytics.storageByFileType && analytics.storageByFileType.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Storage by File Type
+              </CardTitle>
+              <CardDescription>
+                Storage usage breakdown by file format
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {analytics.storageByFileType.map((fileType, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: ['#4f46e5', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'][index % 5] }} 
+                      />
+                      <span>{fileType.fileType}</span>
+                    </div>
+                    <span>{fileType.usage} GB</span>
+                  </div>
+                  <Progress 
+                    value={fileType.percentage} 
+                    className="h-2"
+                    style={{ 
+                      backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                      '--progress-color': ['#4f46e5', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'][index % 5]
+                    } as any}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Activity Overview */}
         <Card>
           <CardHeader>
@@ -442,6 +603,41 @@ export default function AdminReports() {
           </CardContent>
         </Card>
 
+        {/* Top Downloaded Documents */}
+        {analytics.topDocuments && analytics.topDocuments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Most Downloaded Documents
+              </CardTitle>
+              <CardDescription>
+                Documents with highest download count
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analytics.topDocuments.slice(0, 5).map((document, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-medium">{index + 1}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{document.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {document.category} • Uploaded by {document.teacher}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary">{document.downloadCount} downloads</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Quick Actions */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleDocumentReport}>
@@ -451,6 +647,10 @@ export default function AdminReports() {
               <p className="text-sm text-muted-foreground">
                 Detailed document usage analysis
               </p>
+              <Button variant="outline" size="sm" className="mt-4">
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
             </CardContent>
           </Card>
 
@@ -461,6 +661,10 @@ export default function AdminReports() {
               <p className="text-sm text-muted-foreground">
                 Teacher engagement and usage patterns
               </p>
+              <Button variant="outline" size="sm" className="mt-4">
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
             </CardContent>
           </Card>
 
@@ -471,6 +675,10 @@ export default function AdminReports() {
               <p className="text-sm text-muted-foreground">
                 Storage usage and capacity planning
               </p>
+              <Button variant="outline" size="sm" className="mt-4">
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
             </CardContent>
           </Card>
         </div>
