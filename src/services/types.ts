@@ -291,6 +291,28 @@ export interface ReportsData {
   documentsChange?: number;
   downloadsChange?: number;
   storageChange?: number;
+  // Detailed analytics
+  storageByFileType?: Array<{
+    fileType: string;
+    usage: number;
+    percentage: number;
+  }>;
+  topDocuments?: Array<{
+    title: string;
+    downloadCount: number;
+    category: string;
+    teacher: string;
+  }>;
+  activityMetrics?: {
+    avgLoginsPerUser: number;
+    avgUploadsPerTeacher: number;
+    avgDownloadsPerTeacher: number;
+  };
+  activityPatterns?: {
+    mostActiveDay: string;
+    mostActiveHour: number;
+    hourFormat: string;
+  };
 }
 
 // Settings types

@@ -487,6 +487,48 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
+        {/* Report Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" 
+                onClick={() => window.location.href = '/admin/reports'}>
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center text-center pt-4 pb-2">
+                <FileText className="h-10 w-10 text-primary mb-3" />
+                <h3 className="font-semibold text-lg mb-1">Document Report</h3>
+                <p className="text-sm text-muted-foreground">
+                  Detailed document usage analysis
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" 
+                onClick={() => window.location.href = '/admin/reports'}>
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center text-center pt-4 pb-2">
+                <Users className="h-10 w-10 text-primary mb-3" />
+                <h3 className="font-semibold text-lg mb-1">User Activity Report</h3>
+                <p className="text-sm text-muted-foreground">
+                  Teacher engagement and usage patterns
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" 
+                onClick={() => window.location.href = '/admin/reports'}>
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center text-center pt-4 pb-2">
+                <BarChart3 className="h-10 w-10 text-primary mb-3" />
+                <h3 className="font-semibold text-lg mb-1">Storage Report</h3>
+                <p className="text-sm text-muted-foreground">
+                  Storage usage and capacity planning
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Quick Actions */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Button variant="outline" className="h-20 flex-col" onClick={handleViewReports}>
