@@ -249,10 +249,10 @@ export default function PublicShare() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading shared document...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading shared document...</p>
         </div>
       </div>
     );
@@ -260,18 +260,18 @@ export default function PublicShare() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
-            <CardTitle className="text-red-600">Access Denied</CardTitle>
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
+            <CardTitle className="text-destructive">Access Denied</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-gray-600 mb-4">
+            <p className="text-muted-foreground mb-4">
               This could happen if:
             </p>
-            <ul className="text-sm text-gray-500 text-left space-y-1">
+            <ul className="text-sm text-muted-foreground text-left space-y-1">
               <li>• The share link has expired</li>
               <li>• The document is no longer shared</li>
               <li>• The link is malformed or invalid</li>
@@ -284,55 +284,54 @@ export default function PublicShare() {
 
   if (!document) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
-        <p className="text-gray-600">Document not found</p>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex items-center justify-center">
+        <p className="text-muted-foreground">Document not found</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100">
       {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3 mb-2">
-            <Share className="h-6 w-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Shared Document</h1>
-          </div>
-          <p className="text-gray-600">This document has been shared with you</p>
+      <div className="text-center pt-8 pb-6">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-xl mb-4">
+          <Share className="w-8 h-8 text-primary-foreground" />
         </div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Shared Document</h1>
+        <p className="text-muted-foreground">This document has been shared with you</p>
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto p-4">
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-xl mb-2">{document.title}</CardTitle>
-                {document.description && (
-                  <CardDescription className="text-base mb-4">
-                    {document.description}
-                  </CardDescription>
-                )}
-                
-                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span>{document.fileName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Size:</span>
-                    <span>{formatFileSize(document.fileSize)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Type:</span>
-                    <Badge variant="secondary">{document.fileType.toUpperCase()}</Badge>
+      <div className="flex items-center justify-center px-4 pb-8">
+        <div className="w-full max-w-4xl">
+          <Card className="shadow-xl border-0">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-2xl mb-2 text-foreground">{document.title}</CardTitle>
+                  {document.description && (
+                    <CardDescription className="text-base mb-4">
+                      {document.description}
+                    </CardDescription>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      <span>{document.fileName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Size:</span>
+                      <span>{formatFileSize(document.fileSize)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Type:</span>
+                      <Badge variant="secondary">{document.fileType.toUpperCase()}</Badge>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </CardHeader>
+            </CardHeader>
           
           <CardContent className="space-y-4">
             {/* File Actions */}
@@ -360,19 +359,19 @@ export default function PublicShare() {
             {/* Document Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Shared by</h4>
+                <h4 className="font-medium text-foreground mb-2">Shared by</h4>
                 <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-gray-500" />
+                  <User className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">{document.teacher.firstName} {document.teacher.lastName}</p>
-                    <p className="text-sm text-gray-600">{document.teacher.department}</p>
+                    <p className="font-medium text-foreground">{document.teacher.firstName} {document.teacher.lastName}</p>
+                    <p className="text-sm text-muted-foreground">{document.teacher.department}</p>
                   </div>
                 </div>
               </div>
               
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Share Details</h4>
-                <div className="space-y-2 text-sm text-gray-600">
+                <h4 className="font-medium text-foreground mb-2">Share Details</h4>
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     <span>Shared on {formatDate(document.sharedAt || document.createdAt)}</span>
@@ -401,13 +400,21 @@ export default function PublicShare() {
 
             {/* Download Stats */}
             <div className="pt-4 border-t">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CheckCircle className="h-4 w-4" />
                 <span>Downloaded {document.downloadCount} times</span>
               </div>
             </div>
           </CardContent>
         </Card>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="text-center pb-6">
+        <div className="text-xs text-muted-foreground">
+          Secured Document Sharing • Ministry of Education, Kenya
+        </div>
       </div>
 
       {/* Public Preview Modal */}
