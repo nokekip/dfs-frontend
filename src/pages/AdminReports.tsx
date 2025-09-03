@@ -1,5 +1,26 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useReports } from '../hooks/useReports';
+import Layout from '../components/Layout';
+import { Loading } from '../components/Loading';
+import { ErrorMessage } from '../components/ErrorBoundary';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Badge } from '../components/ui/badge';
+import { Progress } from '../components/ui/progress';
+import { 
+  BarChart3, 
+  Download, 
+  TrendingUp,
+  Users,
+  FileText,
+  Share,
+  Calendar,
+  PieChart,
+  Activity,
+  Clock
+} from 'lucide-react';
 
 // Helper functions for report generation
 const generateDocumentReportCSV = (data: any) => {
@@ -79,27 +100,47 @@ const downloadCSV = (csvContent: string, filename: string) => {
     document.body.removeChild(link);
   }
 };
-import Layout from '../components/Layout';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
-import { Progress } from '../components/ui/progress';
-import { 
-  BarChart3, 
-  Download, 
-  TrendingUp,
-  Users,
-  FileText,
-  Share,
-  Calendar,
-  PieChart,
-  Activity,
-  Clock
-} from 'lucide-react';
 
 export default function AdminReports() {
   const [timeRange, setTimeRange] = useState('30');
+  const { data: reportsData, isLoading, error, fetchReports } = useReports();
+
+  // Fetch reports data when component mounts or time range changes
+  useEffect(() => {
+    fetchReports(timeRange);
+  }, [fetchReports, timeRange]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loading text="Loading reports data..." />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Layout>
+        <ErrorMessage message={error} />
+      </Layout>
+    );
+  }
+
+  // Use real data or fallback to empty data
+  const analytics = reportsData || {
+    totalUsers: 0,
+    activeUsers: 0,
+    totalDocuments: 0,
+    totalDownloads: 0,
+    storageUsed: 0,
+    popularCategories: [],
+    monthlyUploads: [],
+    topUploaders: []
+  };
 
   const handleDocumentReport = () => {
     // Generate and download detailed document usage report
@@ -219,35 +260,6 @@ export default function AdminReports() {
     });
   };
 
-  // Mock analytics data
-  const analytics = {
-    totalUsers: 45,
-    activeUsers: 38,
-    totalDocuments: 156,
-    totalDownloads: 1247,
-    storageUsed: 2.4, // GB
-    popularCategories: [
-      { name: 'Lesson Plans', count: 45, percentage: 29 },
-      { name: 'Assessment Reports', count: 32, percentage: 21 },
-      { name: 'Student Records', count: 28, percentage: 18 },
-      { name: 'Administrative Forms', count: 25, percentage: 16 },
-      { name: 'Others', count: 26, percentage: 16 }
-    ],
-    monthlyUploads: [
-      { month: 'Oct', uploads: 23 },
-      { month: 'Nov', uploads: 34 },
-      { month: 'Dec', uploads: 45 },
-      { month: 'Jan', uploads: 54 }
-    ],
-    topUploaders: [
-      { name: 'Jane Mwangi', uploads: 24, downloads: 156 },
-      { name: 'John Kiprotich', uploads: 18, downloads: 134 },
-      { name: 'Mary Ochieng', uploads: 15, downloads: 89 },
-      { name: 'David Mwema', uploads: 12, downloads: 76 },
-      { name: 'Sarah Wanjiku', uploads: 8, downloads: 45 }
-    ]
-  };
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -260,7 +272,10 @@ export default function AdminReports() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Select value={timeRange} onValueChange={setTimeRange}>
+            <Select value={timeRange} onValueChange={(value) => {
+              setTimeRange(value);
+              fetchReports(value);
+            }}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -286,7 +301,9 @@ export default function AdminReports() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Users</p>
                   <p className="text-2xl font-bold">{analytics.totalUsers}</p>
-                  <p className="text-xs text-success">+12% from last month</p>
+                  <p className={`text-xs ${(analytics.usersChange || 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {(analytics.usersChange || 0) >= 0 ? '+' : ''}{analytics.usersChange || 0}% from last period
+                  </p>
                 </div>
                 <Users className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -299,7 +316,9 @@ export default function AdminReports() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Documents</p>
                   <p className="text-2xl font-bold">{analytics.totalDocuments}</p>
-                  <p className="text-xs text-success">+23% from last month</p>
+                  <p className={`text-xs ${(analytics.documentsChange || 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {(analytics.documentsChange || 0) >= 0 ? '+' : ''}{analytics.documentsChange || 0}% from last period
+                  </p>
                 </div>
                 <FileText className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -312,7 +331,9 @@ export default function AdminReports() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Downloads</p>
                   <p className="text-2xl font-bold">{analytics.totalDownloads}</p>
-                  <p className="text-xs text-success">+8% from last month</p>
+                  <p className={`text-xs ${(analytics.downloadsChange || 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {(analytics.downloadsChange || 0) >= 0 ? '+' : ''}{analytics.downloadsChange || 0}% from last period
+                  </p>
                 </div>
                 <Download className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -325,7 +346,9 @@ export default function AdminReports() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Storage Used</p>
                   <p className="text-2xl font-bold">{analytics.storageUsed} GB</p>
-                  <p className="text-xs text-muted-foreground">of 10 GB total</p>
+                  <p className={`text-xs ${(analytics.storageChange || 0) >= 0 ? 'text-muted-foreground' : 'text-success'}`}>
+                    {(analytics.storageChange || 0) >= 0 ? '+' : ''}{analytics.storageChange || 0}% from last period
+                  </p>
                 </div>
                 <BarChart3 className="h-8 w-8 text-muted-foreground" />
               </div>

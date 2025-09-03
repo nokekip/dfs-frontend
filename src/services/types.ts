@@ -266,6 +266,33 @@ export interface TeacherDashboardStats {
   }>;
 }
 
+export interface ReportsData {
+  totalUsers: number;
+  activeUsers: number;
+  totalDocuments: number;
+  totalDownloads: number;
+  storageUsed: number; // in GB
+  popularCategories: Array<{
+    name: string;
+    count: number;
+    percentage: number;
+  }>;
+  monthlyUploads: Array<{
+    month: string;
+    uploads: number;
+  }>;
+  topUploaders: Array<{
+    name: string;
+    uploads: number;
+    downloads: number;
+  }>;
+  // Percentage changes
+  usersChange?: number;
+  documentsChange?: number;
+  downloadsChange?: number;
+  storageChange?: number;
+}
+
 // Settings types
 export interface SystemSettings {
   siteName: string;

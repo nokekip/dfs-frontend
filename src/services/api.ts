@@ -28,6 +28,7 @@ import {
   CategoryUpdateRequest,
   DashboardStats,
   TeacherDashboardStats,
+  ReportsData,
   SystemSettings,
   SecuritySettings,
   ActivityLog,
@@ -2043,7 +2044,7 @@ export class ApiClient {
         throw new ApiError('No authentication token found', 401);
       }
 
-      const response = await fetch(`${config.api.baseUrl}/accounts/dashboard/admin-stats/`, {
+      const response = await fetch(`${config.api.baseUrl}/accounts/admin/dashboard/stats/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -2092,7 +2093,7 @@ export class ApiClient {
         throw new ApiError('No authentication token found', 401);
       }
 
-      const response = await fetch(`${config.api.baseUrl}/accounts/dashboard/teacher-stats/`, {
+      const response = await fetch(`${config.api.baseUrl}/accounts/teacher/dashboard/stats/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -2126,6 +2127,53 @@ export class ApiClient {
       }
 
       throw new ApiError('Failed to fetch teacher dashboard stats', 500);
+    }
+  }
+
+  // Reports Methods
+  async getReportsData(timeRange: string = '30'): Promise<ApiResponse<ReportsData>> {
+    this.requireRole('admin');
+    
+    try {
+      const token = localStorage.getItem(config.auth.tokenKey);
+      if (!token) {
+        throw new ApiError('No authentication token found', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/accounts/admin/reports/?time_range=${timeRange}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
+      }
+
+      const data = await response.json();
+
+      return {
+        success: true,
+        data: data,
+        message: 'Reports data retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('Failed to fetch reports data', 500);
     }
   }
 
