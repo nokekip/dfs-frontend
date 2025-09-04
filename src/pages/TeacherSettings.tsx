@@ -66,8 +66,6 @@ interface SecuritySettings {
 interface NotificationSettings {
   emailNotifications: boolean;
   documentShared: boolean;
-  documentComments: boolean;
-  weeklyDigest: boolean;
 }
 
 export default function TeacherSettings() {
@@ -96,8 +94,6 @@ export default function TeacherSettings() {
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     emailNotifications: true,
     documentShared: true,
-    documentComments: false,
-    weeklyDigest: true,
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -568,30 +564,6 @@ export default function TeacherSettings() {
                       <Switch
                         checked={notificationSettings.documentShared}
                         onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, documentShared: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium">Document Comments</p>
-                        <p className="text-sm text-muted-foreground">
-                          When someone comments on your documents
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.documentComments}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, documentComments: checked }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium">Weekly Digest</p>
-                        <p className="text-sm text-muted-foreground">
-                          Weekly summary of your activity and shared documents
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notificationSettings.weeklyDigest}
-                        onCheckedChange={(checked) => setNotificationSettings(prev => ({ ...prev, weeklyDigest: checked }))}
                       />
                     </div>
                   </div>
