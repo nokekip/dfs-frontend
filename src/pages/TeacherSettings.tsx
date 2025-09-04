@@ -114,6 +114,16 @@ export default function TeacherSettings() {
     }
   }, [user]);
 
+  // Update profile picture when user.profilePicture changes specifically  
+  useEffect(() => {
+    if (user?.profilePicture !== profileData.profilePicture) {
+      setProfileData(prev => ({
+        ...prev,
+        profilePicture: user?.profilePicture || undefined,
+      }));
+    }
+  }, [user?.profilePicture]);
+
   const handleProfileSave = async () => {
     try {
       // Prepare update data

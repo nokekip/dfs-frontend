@@ -175,7 +175,10 @@ export class ApiClient {
               role: data.role,
               username: data.username,
               isActive: true,
-              dateJoined: new Date().toISOString(), // We don't have this from login response
+              dateJoined: data.date_joined || new Date().toISOString(),
+              profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}?t=${Date.now()}` : undefined,
+              phoneNumber: data.phone_number,
+              bio: data.bio,
             },
             tokens: null, // No tokens until OTP is verified
             requiresOtp: true,
@@ -194,8 +197,11 @@ export class ApiClient {
           role: data.user.role,
           username: data.user.username,
           isActive: true,
-          dateJoined: new Date().toISOString(),
+          dateJoined: data.user.date_joined || new Date().toISOString(),
           lastLogin: new Date().toISOString(),
+          profilePicture: data.user.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.user.profile_picture}?t=${Date.now()}` : undefined,
+          phoneNumber: data.user.phone_number,
+          bio: data.user.bio,
         };
 
         const tokens: AuthTokens = {
@@ -330,8 +336,11 @@ export class ApiClient {
         role: responseData.user.role,
         username: responseData.user.username,
         isActive: true,
-        dateJoined: new Date().toISOString(),
+        dateJoined: responseData.user.date_joined || new Date().toISOString(),
         lastLogin: new Date().toISOString(),
+        profilePicture: responseData.user.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${responseData.user.profile_picture}?t=${Date.now()}` : undefined,
+        phoneNumber: responseData.user.phone_number,
+        bio: responseData.user.bio,
       };
 
       const tokens: AuthTokens = {
@@ -554,7 +563,7 @@ export class ApiClient {
         isActive: data.is_active,
         dateJoined: data.date_joined,
         lastLogin: data.last_login,
-        profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}` : undefined,
+        profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}?t=${Date.now()}` : undefined,
         phoneNumber: data.phone_number,
         bio: data.bio,
       };
@@ -661,7 +670,7 @@ export class ApiClient {
         isActive: responseData.is_active,
         dateJoined: responseData.date_joined,
         lastLogin: responseData.last_login,
-        profilePicture: responseData.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${responseData.profile_picture}` : undefined,
+        profilePicture: responseData.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${responseData.profile_picture}?t=${Date.now()}` : undefined,
         phoneNumber: responseData.phone_number,
         bio: responseData.bio,
       };

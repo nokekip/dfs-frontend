@@ -48,28 +48,55 @@ export const useAuth = (): AuthState & AuthActions => {
 
   // Initialize auth state on mount
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       try {
         const token = localStorage.getItem(config.auth.tokenKey);
-        const userString = localStorage.getItem(config.auth.userKey);
         
-        if (token && userString) {
-          const user = JSON.parse(userString) as User;
-          setState({
-            user,
-            isAuthenticated: true,
-            isLoading: false,
-            isLoginLoading: false,
-            isLogoutLoading: false,
-            error: null,
-            pendingOtpUser: null,
-          });
-        } else {
-          setState(prev => ({
-            ...prev,
-            isLoading: false,
-          }));
+        if (token) {
+          // If we have a token, fetch the latest profile data from server
+          try {
+            console.log('Initializing auth: fetching profile data...');
+            const response = await apiClient.getProfile();
+            if (response.success && response.data) {
+              console.log('Profile data fetched successfully:', response.data);
+              setState({
+                user: response.data,
+                isAuthenticated: true,
+                isLoading: false,
+                isLoginLoading: false,
+                isLogoutLoading: false,
+                error: null,
+                pendingOtpUser: null,
+              });
+              return;
+            }
+          } catch (error) {
+            // If profile fetch fails, fall back to cached user data
+            console.warn('Failed to fetch fresh profile data, using cached data:', error);
+          }
+          
+          // Fallback to cached user data if API call fails
+          const userString = localStorage.getItem(config.auth.userKey);
+          if (userString) {
+            const user = JSON.parse(userString) as User;
+            setState({
+              user,
+              isAuthenticated: true,
+              isLoading: false,
+              isLoginLoading: false,
+              isLogoutLoading: false,
+              error: null,
+              pendingOtpUser: null,
+            });
+            return;
+          }
         }
+        
+        // No token or user data found
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+        }));
       } catch (error) {
         console.error('Failed to initialize auth:', error);
         setState(prev => ({
@@ -191,6 +218,7 @@ export const useAuth = (): AuthState & AuthActions => {
       const response = await apiClient.verifyOTP(data);
       
       if (response.success && response.data) {
+        // Set initial user data from OTP response
         setState({
           user: response.data.user,
           isAuthenticated: true,
@@ -200,6 +228,21 @@ export const useAuth = (): AuthState & AuthActions => {
           error: null,
           pendingOtpUser: null,
         });
+
+        // Fetch complete profile data to get profile picture and other details
+        try {
+          const profileResponse = await apiClient.getProfile();
+          if (profileResponse.success) {
+            console.log('Fetched profile data after OTP:', profileResponse.data);
+            setState(prev => ({
+              ...prev,
+              user: profileResponse.data,
+            }));
+          }
+        } catch (profileError) {
+          console.warn('Failed to fetch complete profile after login:', profileError);
+          // Continue with login even if profile fetch fails
+        }
 
         toast.success('Welcome back!', {
           description: `Welcome ${response.data.user.firstName} ${response.data.user.lastName}`,
@@ -322,6 +365,20 @@ export const useAuth = (): AuthState & AuthActions => {
           description: 'Your profile has been updated successfully.',
         });
 
+        // If profile picture was updated, force a refresh to get the latest URL
+        if (data.profilePictureFile || data.removeProfilePicture) {
+          setTimeout(async () => {
+            try {
+              const refreshResponse = await apiClient.getProfile();
+              if (refreshResponse.success && refreshResponse.data) {
+                setState(prev => ({ ...prev, user: refreshResponse.data }));
+              }
+            } catch (error) {
+              console.warn('Failed to refresh profile after image update:', error);
+            }
+          }, 500); // Small delay to ensure backend has processed the image
+        }
+
         return true;
       }
 
@@ -346,17 +403,28 @@ export const useAuth = (): AuthState & AuthActions => {
     }
   }, [state.user]);
 
-  const refreshUser = useCallback(() => {
-    const userStr = localStorage.getItem(config.auth.userKey);
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setState(prev => ({ ...prev, user }));
-      } catch (error) {
-        console.warn('Failed to parse user from localStorage:', error);
+  const refreshUser = useCallback(async () => {
+    if (!state.isAuthenticated) return;
+    
+    try {
+      const response = await apiClient.getProfile();
+      if (response.success && response.data) {
+        setState(prev => ({ ...prev, user: response.data }));
+      }
+    } catch (error) {
+      console.warn('Failed to refresh user profile:', error);
+      // Fall back to cached data
+      const userStr = localStorage.getItem(config.auth.userKey);
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          setState(prev => ({ ...prev, user }));
+        } catch (error) {
+          console.warn('Failed to parse user from localStorage:', error);
+        }
       }
     }
-  }, []);
+  }, [state.isAuthenticated]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
