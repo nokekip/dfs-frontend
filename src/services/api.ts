@@ -108,13 +108,26 @@ export class ApiClient {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+        
         if (response.status === 401) {
-          // Token might be expired, clear auth state
+          // Check if it's a session expiry
+          if (errorData.code === 'SESSION_EXPIRED') {
+            // Emit session expired event for the app to handle
+            window.dispatchEvent(new CustomEvent('session-expired', {
+              detail: {
+                message: errorData.detail || 'Your session has expired',
+                timeout: true
+              }
+            }));
+          }
+          
+          // Clear auth state for any 401
           localStorage.removeItem(config.auth.tokenKey);
           localStorage.removeItem(config.auth.refreshTokenKey);
           localStorage.removeItem(config.auth.userKey);
         }
-        const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+        
         throw new ApiError(errorData.error || `HTTP error! status: ${response.status}`, response.status);
       }
 

@@ -13,7 +13,8 @@ interface AuthContextType {
   verifyOTP: (userId: string, otp: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
-    updateUser: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<void>;
+  updateUser: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<void>;
+  handleSessionExpiry: () => void;
 }
 
 interface RegisterData {
@@ -83,6 +84,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     register,
     logout,
     updateUser,
+    handleSessionExpiry: authHook.handleSessionExpiry,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

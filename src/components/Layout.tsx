@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useGlobalSettings } from '../contexts/SettingsContext';
+import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { Button } from './ui/button';
 import UserAvatar from './UserAvatar';
+import SessionWarningDialog from './SessionWarningDialog';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -45,6 +47,26 @@ export default function Layout({ children }: LayoutProps) {
   const { getSiteName } = useGlobalSettings();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Session timeout management
+  const {
+    showWarning,
+    timeRemaining,
+    extendSession,
+    forceLogout
+  } = useSessionTimeout();
+
+  // Handle session expired events from API
+  useEffect(() => {
+    const handleSessionExpired = (event: any) => {
+      // Force logout when session expires
+      forceLogout();
+      handleLogout();
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+    return () => window.removeEventListener('session-expired', handleSessionExpired);
+  }, [forceLogout]);
 
   const handleLogout = () => {
     logout();
@@ -145,6 +167,16 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Session Warning Dialog */}
+      <SessionWarningDialog
+        isOpen={showWarning}
+        timeRemaining={timeRemaining}
+        onExtendSession={extendSession}
+        onLogout={() => {
+          forceLogout();
+          handleLogout();
+        }}
+      />
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card">

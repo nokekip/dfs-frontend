@@ -33,6 +33,7 @@ interface AuthActions {
   updateProfile: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<boolean>;
   refreshUser: () => void;
   clearError: () => void;
+  handleSessionExpiry: () => void;
 }
 
 export const useAuth = (): AuthState & AuthActions => {
@@ -435,6 +436,28 @@ export const useAuth = (): AuthState & AuthActions => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  const handleSessionExpiry = useCallback(() => {
+    // Clear all auth data without API call
+    setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      isLoginLoading: false,
+      isLogoutLoading: false,
+      error: null,
+      pendingOtpUser: null,
+    });
+
+    // Clear storage
+    localStorage.removeItem(config.auth.tokenKey);
+    localStorage.removeItem(config.auth.refreshTokenKey);
+    localStorage.removeItem(config.auth.userKey);
+
+    toast.info('Session Expired', {
+      description: 'Your session has expired. Please log in again.',
+    });
+  }, []);
+
   return {
     ...state,
     login,
@@ -445,6 +468,7 @@ export const useAuth = (): AuthState & AuthActions => {
     updateProfile,
     refreshUser,
     clearError,
+    handleSessionExpiry,
   };
 };
 
