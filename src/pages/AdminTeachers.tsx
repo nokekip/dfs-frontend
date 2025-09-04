@@ -524,10 +524,6 @@ export default function AdminTeachers() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Mail className="h-4 w-4 mr-2" />
-                          Send Email
-                        </DropdownMenuItem>
                         {teacher.status === 'active' && (
                           <DropdownMenuItem onClick={() => handleSuspendTeacher(teacher)}>
                             <Pause className="h-4 w-4 mr-2" />
