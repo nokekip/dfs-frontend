@@ -118,6 +118,27 @@ export default function TeacherShared() {
     setShareDialogOpen(true);
   };
 
+  const handleCopyShareLink = async (document: any, share: any) => {
+    // Check if this document has a public share link
+    if (share.share_type === 'public' && share.public_url) {
+      const fullUrl = `${window.location.origin}${share.public_url}`;
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('Link Copied', {
+          description: 'Public share link copied to clipboard'
+        });
+      } catch (error) {
+        toast.error('Failed to copy link', {
+          description: 'Please try again'
+        });
+      }
+    } else {
+      toast.error('No public link available', {
+        description: 'This document is not publicly shared'
+      });
+    }
+  };
+
   const handleShareSubmit = async (shareData: any) => {
     if (selectedDocument) {
       try {
@@ -411,10 +432,17 @@ export default function TeacherShared() {
                                   <UserPlus className="h-4 w-4 mr-2" />
                                   Share with More
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Copy Share Link
-                                </DropdownMenuItem>
+                                {share.share_type === 'public' && share.public_url ? (
+                                  <DropdownMenuItem onClick={() => handleCopyShareLink(document, share)}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy Public Link
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onClick={() => handleShareMore(document)}>
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Create Public Link
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => handleDownload(document)}>
                                   <Download className="h-4 w-4 mr-2" />
                                   Download
@@ -459,7 +487,10 @@ export default function TeacherShared() {
                             <div className="flex items-center gap-2 text-sm">
                               <Users className="h-4 w-4 text-muted-foreground" />
                               <span className="text-muted-foreground">
-                                Shared with {share.shared_with_name || 'Public'}
+                                {share.share_type === 'public' 
+                                  ? 'Shared publicly' 
+                                  : `Shared with ${share.shared_with_name || 'Private'}`
+                                }
                               </span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
@@ -468,6 +499,14 @@ export default function TeacherShared() {
                                 Shared {formatDate(share.shared_at)}
                               </span>
                             </div>
+                            {share.share_type === 'public' && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground text-xs">
+                                  Public link available
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Stats */}

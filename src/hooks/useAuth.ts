@@ -13,7 +13,6 @@ import {
   PasswordResetRequest
 } from '../services/types';
 import { apiClient, ApiError } from '../services/api';
-import { mockDataStore } from '../services/mockData';
 
 interface AuthState {
   user: User | null;
@@ -196,6 +195,8 @@ export const useAuth = (): AuthState & AuthActions => {
           user: response.data.user,
           isAuthenticated: true,
           isLoading: false,
+          isLoginLoading: false,
+          isLogoutLoading: false,
           error: null,
           pendingOtpUser: null,
         });
@@ -346,9 +347,14 @@ export const useAuth = (): AuthState & AuthActions => {
   }, [state.user]);
 
   const refreshUser = useCallback(() => {
-    const user = mockDataStore.getCurrentUser();
-    if (user) {
-      setState(prev => ({ ...prev, user }));
+    const userStr = localStorage.getItem(config.auth.userKey);
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setState(prev => ({ ...prev, user }));
+      } catch (error) {
+        console.warn('Failed to parse user from localStorage:', error);
+      }
     }
   }, []);
 

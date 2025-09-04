@@ -94,6 +94,9 @@ export const useDocumentShares = (): DocumentSharesState & DocumentSharesActions
             tags: [],
             createdAt: share.document_created_at || share.shared_at,
             updatedAt: share.document_created_at || share.shared_at,
+            // Include the public share URL if this is a public share
+            public_share_url: share.share_type === 'public' ? share.public_url : undefined,
+            shared_with_emails: [], // This would need to be populated from a separate API call if needed
           };
           
           return {

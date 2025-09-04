@@ -39,25 +39,7 @@ import {
   AuthTokens
 } from './types';
 
-import { mockDataStore } from './mockData';
 import API_ENDPOINTS from './endpoints';
-
-// Simulate network delay
-const NETWORK_DELAY = 500; // ms
-
-const delay = (ms: number = NETWORK_DELAY): Promise<void> => 
-  new Promise(resolve => setTimeout(resolve, ms));
-
-// Mock JWT tokens
-const generateMockToken = (user: User): AuthTokens => ({
-  access: `mock_access_token_${user.id}_${Date.now()}`,
-  refresh: `mock_refresh_token_${user.id}_${Date.now()}`,
-});
-
-// Error simulation helper
-const simulateError = (message: string, status: number = 400): never => {
-  throw new ApiError(message, status);
-};
 
 // API Client Class
 export class ApiClient {
@@ -71,13 +53,11 @@ export class ApiClient {
   }
 
   private getAuthHeader(): Record<string, string> {
-    // Try localStorage first (for integrated methods), then fallback to mockDataStore
-    const token = localStorage.getItem(config.auth.tokenKey) || mockDataStore.getAuthToken();
+    const token = localStorage.getItem(config.auth.tokenKey);
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   private getCurrentUser(): User {
-    // Try localStorage first (for integrated methods), then fallback to mockDataStore
     const userFromStorage = localStorage.getItem(config.auth.userKey);
     let user: User | null = null;
     
@@ -90,11 +70,7 @@ export class ApiClient {
     }
     
     if (!user) {
-      user = mockDataStore.getCurrentUser();
-    }
-    
-    if (!user) {
-      simulateError('Authentication required', 401);
+      throw new ApiError('Authentication required', 401);
     }
     return user;
   }
@@ -102,7 +78,7 @@ export class ApiClient {
   private requireRole(role: 'admin' | 'teacher'): User {
     const user = this.getCurrentUser();
     if (user.role !== role) {
-      simulateError('Insufficient permissions', 403);
+      throw new ApiError('Insufficient permissions', 403);
     }
     return user;
   }
@@ -1222,6 +1198,8 @@ export class ApiClient {
         tags: [],
         createdAt: doc.created_at,
         updatedAt: doc.updated_at,
+        public_share_url: doc.public_share_url || undefined,
+        shared_with_emails: doc.shared_with_emails || [],
       }));
 
       return {
@@ -1701,6 +1679,8 @@ export class ApiClient {
         tags: [],
         createdAt: responseData.created_at,
         updatedAt: responseData.updated_at,
+        public_share_url: responseData.public_share_url || undefined,
+        shared_with_emails: responseData.shared_with_emails || [],
       };
 
       return {

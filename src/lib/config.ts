@@ -8,7 +8,6 @@ export const config = {
   api: {
     baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
     timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10),
-    enableMockData: import.meta.env.VITE_ENABLE_MOCK_DATA === 'true',
   },
 
   // Development Settings
