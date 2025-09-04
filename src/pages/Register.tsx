@@ -26,7 +26,7 @@ export default function Register() {
   const [registrationStatus, setRegistrationStatus] = useState<'loading' | 'enabled' | 'disabled'>('loading');
 
   const { register, isLoading } = useAuth();
-  const { getSiteName, systemSettings } = useGlobalSettings();
+  const { getSiteName, getMaintenanceMode, getRegistrationEnabled } = useGlobalSettings();
   const navigate = useNavigate();
 
   // Check registration status on mount and when settings change
@@ -117,7 +117,7 @@ export default function Register() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex flex-col">
         {/* Maintenance Mode Banner */}
-        {systemSettings?.maintenanceMode && (
+        {getMaintenanceMode() && (
           <MaintenanceBanner dismissible={false} />
         )}
         
@@ -202,7 +202,7 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex flex-col">
       {/* Maintenance Mode Banner */}
-      {systemSettings?.maintenanceMode && (
+      {getMaintenanceMode() && (
         <MaintenanceBanner dismissible={false} />
       )}
       

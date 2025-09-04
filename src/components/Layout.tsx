@@ -45,7 +45,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
-  const { getSiteName, systemSettings } = useGlobalSettings();
+  const { getSiteName, getMaintenanceMode } = useGlobalSettings();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -179,10 +179,6 @@ export default function Layout({ children }: LayoutProps) {
         }}
       />
 
-      {/* Maintenance Mode Banner */}
-      {systemSettings?.maintenanceMode && (
-        <MaintenanceBanner />
-      )}
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card">
@@ -199,6 +195,11 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main Content */}
       <div className="lg:pl-72">
+        {/* Maintenance Mode Banner */}
+        {getMaintenanceMode() && (
+          <MaintenanceBanner />
+        )}
+        
         {/* Header */}
         <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-card/80 backdrop-blur px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
           {/* Mobile Menu Button */}

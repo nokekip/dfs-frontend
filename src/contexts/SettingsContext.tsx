@@ -9,6 +9,8 @@ interface SettingsContextType {
   refreshSettings: () => Promise<void>;
   getSiteName: () => string;
   getSiteDescription: () => string;
+  getMaintenanceMode: () => boolean;
+  getRegistrationEnabled: () => boolean;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -27,7 +29,11 @@ interface SettingsProviderProps {
 
 export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [basicSettings, setBasicSettings] = useState<{ siteName?: string; registrationEnabled?: boolean } | null>(null);
+  const [basicSettings, setBasicSettings] = useState<{ 
+    siteName?: string; 
+    registrationEnabled?: boolean; 
+    maintenanceMode?: boolean; 
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
@@ -58,7 +64,8 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
       if (response.success && response.data) {
         setBasicSettings({
           siteName: response.data.site_name,
-          registrationEnabled: response.data.registration_enabled
+          registrationEnabled: response.data.registration_enabled,
+          maintenanceMode: response.data.maintenance_mode
         });
       }
     } catch (error) {
@@ -72,6 +79,14 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 
   const getSiteDescription = () => {
     return systemSettings?.siteDescription || 'Kenya Teacher Document Management System';
+  };
+
+  const getMaintenanceMode = () => {
+    return systemSettings?.maintenanceMode || basicSettings?.maintenanceMode || false;
+  };
+
+  const getRegistrationEnabled = () => {
+    return systemSettings?.registrationEnabled ?? basicSettings?.registrationEnabled ?? true;
   };
 
   // Update document title when settings change
@@ -98,6 +113,8 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
     refreshSettings,
     getSiteName,
     getSiteDescription,
+    getMaintenanceMode,
+    getRegistrationEnabled,
   };
 
   return (

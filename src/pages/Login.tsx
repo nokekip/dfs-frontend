@@ -22,30 +22,10 @@ export default function Login() {
   const [showOTP, setShowOTP] = useState(false);
   const [otpMessage, setOtpMessage] = useState('');
   const [userId, setUserId] = useState(''); // Store user ID for OTP verification
-  const [registrationEnabled, setRegistrationEnabled] = useState(true);
   
   const { login, verifyOTP, isLoginLoading } = useAuth();
-  const { getSiteName, systemSettings } = useGlobalSettings();
+  const { getSiteName, getMaintenanceMode, getRegistrationEnabled } = useGlobalSettings();
   const navigate = useNavigate();
-
-  // Check registration status
-  useEffect(() => {
-    const checkRegistrationStatus = async () => {
-      try {
-        const response = await apiClient.getPublicSettings();
-
-        if (response.success && response.data) {
-          setRegistrationEnabled(response.data.registration_enabled);
-        }
-      } catch (error) {
-        console.warn('Failed to check registration status:', error);
-        // Default to enabled for better UX
-        setRegistrationEnabled(true);
-      }
-    };
-
-    checkRegistrationStatus();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +69,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex flex-col">
       {/* Maintenance Mode Banner */}
-      {systemSettings?.maintenanceMode && (
+      {getMaintenanceMode() && (
         <MaintenanceBanner dismissible={false} />
       )}
       
@@ -251,7 +231,7 @@ export default function Login() {
               </Link>
             </div>
             
-            {registrationEnabled && (
+            {getRegistrationEnabled() && (
               <div className="text-center text-sm text-muted-foreground">
                 New teacher? {' '}
                 <Link 
@@ -263,7 +243,7 @@ export default function Login() {
               </div>
             )}
 
-            {!registrationEnabled && (
+            {!getRegistrationEnabled() && (
               <div className="text-center text-sm text-muted-foreground">
                 Registration is currently closed. Contact your administrator for access.
               </div>
