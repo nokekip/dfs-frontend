@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useGlobalSettings } from '../contexts/SettingsContext';
 import { useDashboard } from '../hooks/useDashboard';
+import { apiClient } from '../services/api';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -19,13 +21,36 @@ export default function Index() {
   const navigate = useNavigate();
   const { getSiteName, getSiteDescription } = useGlobalSettings();
   const { stats } = useDashboard('teacher');
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+
+  // Check registration status
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const response = await apiClient.getPublicSettings();
+
+        if (response.success && response.data) {
+          setRegistrationEnabled(response.data.registration_enabled);
+        }
+      } catch (error) {
+        console.warn('Failed to check registration status:', error);
+        setRegistrationEnabled(true);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
 
   const handleLogin = () => {
     navigate('/login');
   };
 
   const handleRegister = () => {
-    navigate('/register');
+    if (registrationEnabled) {
+      navigate('/register');
+    } else {
+      navigate('/login');
+    }
   };
 
   const features = [
@@ -65,9 +90,15 @@ export default function Index() {
               <Button variant="outline" onClick={handleLogin}>
                 Sign In
               </Button>
-              <Button onClick={handleRegister}>
-                Get Started
-              </Button>
+              {registrationEnabled ? (
+                <Button onClick={handleRegister}>
+                  Get Started
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={handleLogin}>
+                  Sign In
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -83,10 +114,17 @@ export default function Index() {
             {getSiteDescription()}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={handleRegister} className="gap-2">
-              Start Managing Documents
-              <ArrowRight className="w-4 h-4" />
-            </Button>
+            {registrationEnabled ? (
+              <Button size="lg" onClick={handleRegister} className="gap-2">
+                Start Managing Documents
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button size="lg" onClick={handleLogin} className="gap-2">
+                Sign In to Get Started
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            )}
             <Button size="lg" variant="outline" onClick={handleLogin}>
               Sign In to Your Account
             </Button>
@@ -168,12 +206,22 @@ export default function Index() {
             Ready to Get Started?
           </h3>
           <p className="text-primary-foreground/80 mb-6 max-w-2xl mx-auto">
-            Join thousands of teachers already using {getSiteName()} to organize and share their educational resources.
+            {registrationEnabled 
+              ? `Join thousands of teachers already using ${getSiteName()} to organize and share their educational resources.`
+              : `Sign in to access ${getSiteName()} and manage your educational resources.`
+            }
           </p>
-          <Button size="lg" variant="secondary" onClick={handleRegister} className="gap-2">
-            <CheckCircle className="w-4 h-4" />
-            Create Your Account
-          </Button>
+          {registrationEnabled ? (
+            <Button size="lg" variant="secondary" onClick={handleRegister} className="gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Create Your Account
+            </Button>
+          ) : (
+            <Button size="lg" variant="secondary" onClick={handleLogin} className="gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Sign In Now
+            </Button>
+          )}
         </div>
       </section>
 

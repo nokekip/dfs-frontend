@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGlobalSettings } from '../contexts/SettingsContext';
+import { apiClient } from '../services/api';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,10 +22,30 @@ export default function Login() {
   const [showOTP, setShowOTP] = useState(false);
   const [otpMessage, setOtpMessage] = useState('');
   const [userId, setUserId] = useState(''); // Store user ID for OTP verification
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
   
   const { login, verifyOTP, isLoginLoading } = useAuth();
   const { getSiteName, systemSettings } = useGlobalSettings();
   const navigate = useNavigate();
+
+  // Check registration status
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const response = await apiClient.getPublicSettings();
+
+        if (response.success && response.data) {
+          setRegistrationEnabled(response.data.registration_enabled);
+        }
+      } catch (error) {
+        console.warn('Failed to check registration status:', error);
+        // Default to enabled for better UX
+        setRegistrationEnabled(true);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,15 +251,23 @@ export default function Login() {
               </Link>
             </div>
             
-            <div className="text-center text-sm text-muted-foreground">
-              New teacher? {' '}
-              <Link 
-                to="/register" 
-                className="text-primary hover:underline font-medium"
-              >
-                Request Account Access
-              </Link>
-            </div>
+            {registrationEnabled && (
+              <div className="text-center text-sm text-muted-foreground">
+                New teacher? {' '}
+                <Link 
+                  to="/register" 
+                  className="text-primary hover:underline font-medium"
+                >
+                  Request Account Access
+                </Link>
+              </div>
+            )}
+
+            {!registrationEnabled && (
+              <div className="text-center text-sm text-muted-foreground">
+                Registration is currently closed. Contact your administrator for access.
+              </div>
+            )}
           </CardFooter>
         </Card>
 

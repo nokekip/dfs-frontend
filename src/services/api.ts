@@ -203,7 +203,7 @@ export class ApiClient {
         };
       }
 
-      // If no OTP required (shouldn't happen with current backend, but handling it)
+      // If no OTP required (direct login when 2FA is disabled)
       if (data.access && data.refresh) {
         const user: User = {
           id: data.user.id.toString(), // Convert to string to match interface

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useGlobalSettings } from '../contexts/SettingsContext';
+import { apiClient } from '../services/api';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,7 +10,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import MaintenanceBanner from '../components/MaintenanceBanner';
-import { Loader2, User, Mail, Phone, Lock, GraduationCap, CheckCircle } from 'lucide-react';
+import { Loader2, User, Mail, Phone, Lock, GraduationCap, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -22,10 +23,33 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState<'loading' | 'enabled' | 'disabled'>('loading');
 
   const { register, isLoading } = useAuth();
   const { getSiteName, systemSettings } = useGlobalSettings();
   const navigate = useNavigate();
+
+  // Check registration status on mount and when settings change
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        // Check public settings for registration enabled using API client
+        const response = await apiClient.getPublicSettings();
+
+        if (response.success && response.data) {
+          setRegistrationStatus(response.data.registration_enabled ? 'enabled' : 'disabled');
+        } else {
+          // If we can't determine, assume enabled for better UX
+          setRegistrationStatus('enabled');
+        }
+      } catch (error) {
+        console.warn('Failed to check registration status:', error);
+        setRegistrationStatus('enabled');
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,8 +75,17 @@ export default function Register() {
         password: formData.password,
       });
       setSuccess(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+    } catch (err: any) {
+      // Handle specific registration disabled error
+      if (err?.message?.includes('registration is currently disabled') || 
+          err?.status === 403) {
+        setRegistrationStatus('disabled');
+        toast.error('Registration Disabled', {
+          description: 'Teacher registration is currently closed. Please contact the administrator.',
+        });
+      } else {
+        setError(err instanceof Error ? err.message : 'Registration failed');
+      }
     }
   };
 
@@ -62,6 +95,75 @@ export default function Register() {
       [e.target.name]: e.target.value
     }));
   };
+
+  // Show loading state while checking registration status
+  if (registrationStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-lg border-0">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-muted-foreground">Checking registration status...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show registration disabled message
+  if (registrationStatus === 'disabled') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex flex-col">
+        {/* Maintenance Mode Banner */}
+        {systemSettings?.maintenanceMode && (
+          <MaintenanceBanner dismissible={false} />
+        )}
+        
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg">
+            {/* Logo and Header */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-xl mb-4">
+                <GraduationCap className="w-8 h-8 text-primary-foreground" />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground">Teacher Registration</h1>
+              <p className="text-muted-foreground mt-1">{getSiteName()} • Kenya</p>
+            </div>
+
+            <Card className="shadow-lg border-0">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-warning/10 rounded-full">
+                    <AlertTriangle className="w-8 h-8 text-warning" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold">Registration Currently Closed</h2>
+                    <p className="text-muted-foreground mt-2">
+                      Teacher registration is temporarily disabled. Please contact the system administrator for assistance or try again later.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={() => navigate('/login')}
+                      className="w-full"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Login
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      If you already have an account, you can still log in
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
