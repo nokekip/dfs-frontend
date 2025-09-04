@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import MaintenanceBanner from '../components/MaintenanceBanner';
 import { Loader2, Mail, Lock, Smartphone, GraduationCap, Shield } from 'lucide-react';
 
 export default function Login() {
@@ -22,7 +23,7 @@ export default function Login() {
   const [userId, setUserId] = useState(''); // Store user ID for OTP verification
   
   const { login, verifyOTP, isLoginLoading } = useAuth();
-  const { getSiteName } = useGlobalSettings();
+  const { getSiteName, systemSettings } = useGlobalSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,8 +66,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex flex-col">
+      {/* Maintenance Mode Banner */}
+      {systemSettings?.maintenanceMode && (
+        <MaintenanceBanner dismissible={false} />
+      )}
+      
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-xl mb-4">
@@ -237,6 +244,7 @@ export default function Login() {
 
         <div className="text-center mt-6 text-xs text-muted-foreground">
           Secured by 2-Factor Authentication • Ministry of Education, Kenya
+        </div>
         </div>
       </div>
     </div>

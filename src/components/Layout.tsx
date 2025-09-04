@@ -7,6 +7,7 @@ import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { Button } from './ui/button';
 import UserAvatar from './UserAvatar';
 import SessionWarningDialog from './SessionWarningDialog';
+import MaintenanceBanner from './MaintenanceBanner';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -44,7 +45,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
-  const { getSiteName } = useGlobalSettings();
+  const { getSiteName, systemSettings } = useGlobalSettings();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -177,6 +178,11 @@ export default function Layout({ children }: LayoutProps) {
           handleLogout();
         }}
       />
+
+      {/* Maintenance Mode Banner */}
+      {systemSettings?.maintenanceMode && (
+        <MaintenanceBanner />
+      )}
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card">

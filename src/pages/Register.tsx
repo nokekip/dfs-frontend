@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import MaintenanceBanner from '../components/MaintenanceBanner';
 import { Loader2, User, Mail, Phone, Lock, GraduationCap, CheckCircle } from 'lucide-react';
 
 export default function Register() {
@@ -23,7 +24,7 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
 
   const { register, isLoading } = useAuth();
-  const { getSiteName } = useGlobalSettings();
+  const { getSiteName, systemSettings } = useGlobalSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,8 +98,14 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-primary-100 flex flex-col">
+      {/* Maintenance Mode Banner */}
+      {systemSettings?.maintenanceMode && (
+        <MaintenanceBanner dismissible={false} />
+      )}
+      
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-xl mb-4">
@@ -270,6 +277,7 @@ export default function Register() {
               Sign In
             </Link>
           </p>
+        </div>
         </div>
       </div>
     </div>
