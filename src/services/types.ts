@@ -143,6 +143,13 @@ export interface Document {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  // New fields for persistent sharing
+  public_share_url?: string; // Will be null if no public share exists
+  shared_with_emails: Array<{
+    email: string;
+    name: string;
+    shared_at: string;
+  }>;
 }
 
 export interface DocumentCreateRequest {

@@ -60,6 +60,22 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
     }
   }, [open, document]);
 
+  // Populate existing share data when dialog opens
+  useEffect(() => {
+    if (open && document) {
+      // Populate public share if it exists
+      if (document.public_share_url) {
+        setIsPublic(true);
+        setPublicLink(`${window.location.origin}${document.public_share_url}`);
+      }
+      
+      // Populate private shares if they exist
+      if (document.shared_with_emails && document.shared_with_emails.length > 0) {
+        setEmails(document.shared_with_emails.map(share => share.email));
+      }
+    }
+  }, [open, document]);
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -106,33 +122,42 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
     
     try {
       if (isPublic) {
-        // Create public share
-        const shareRequest: DocumentShareRequest = {
-          share_type: 'public',
-          can_download: true,
-          can_view: true,
-        };
-        
-        const response = await apiClient.shareDocument(document.id, shareRequest);
-        
-        if (response.success && response.data.public_url) {
-          const fullUrl = `${window.location.origin}${response.data.public_url}`;
-          setPublicLink(fullUrl);
+        if (publicLink) {
+          // If public link already exists, just copy it
+          await copyToClipboard(publicLink);
+          return;
+        } else {
+          // Only create public share if we don't already have a link
+          const shareRequest: DocumentShareRequest = {
+            share_type: 'public',
+            can_download: true,
+            can_view: true,
+          };
           
-          toast.success('Public Link Created', {
-            description: 'Document is now publicly accessible via the link'
-          });
+          const response = await apiClient.shareDocument(document.id, shareRequest);
           
-          // Mark that we created a share, but don't call onShare yet
-          setHasCreatedShare(true);
+          if (response.success && response.data.public_url) {
+            const fullUrl = `${window.location.origin}${response.data.public_url}`;
+            setPublicLink(fullUrl);
+            
+            toast.success('Public Link Created', {
+              description: 'Document is now publicly accessible via the link'
+            });
+            
+            // Mark that we created a share, but don't call onShare yet
+            setHasCreatedShare(true);
+          }
         }
       }
       
-      // Handle private shares (emails)
-      if (emails.length > 0) {
+      // Handle private shares (emails) - only add new emails
+      const existingEmails = document.shared_with_emails?.map(share => share.email) || [];
+      const newEmails = emails.filter(email => !existingEmails.includes(email));
+      
+      if (newEmails.length > 0) {
         const shareRequest: DocumentShareRequest = {
           share_type: 'private',
-          shared_with_emails: emails,
+          shared_with_emails: newEmails,
           can_download: true,
           can_view: true,
           message: message.trim() || undefined,
@@ -142,11 +167,10 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
         
         if (response.success) {
           toast.success('Document Shared', {
-            description: `Document shared with ${emails.length} ${emails.length === 1 ? 'person' : 'people'}`
+            description: `Document shared with ${newEmails.length} new ${newEmails.length === 1 ? 'person' : 'people'}`
           });
           
-          // Clear the email list and message after successful share
-          setEmails([]);
+          // Clear the message after successful share
           setMessage('');
           
           // Mark that we created a share
@@ -157,6 +181,11 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
             onShare();
           }
         }
+      } else if (emails.length > 0 && newEmails.length === 0) {
+        // All emails are already shared
+        toast.info('Already Shared', {
+          description: 'Document is already shared with all specified recipients'
+        });
       }
       
     } catch (error) {
@@ -289,6 +318,12 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
                 {copySuccess && (
                   <p className="text-xs text-green-600">Link copied to clipboard!</p>
                 )}
+                {document?.publicShareUrl && (
+                  <p className="text-xs text-blue-600">
+                    <Globe className="h-3 w-3 inline mr-1" />
+                    This is your existing public share link
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -326,18 +361,26 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
                   People with access ({emails.length})
                 </Label>
                 <div className="flex flex-wrap gap-1">
-                  {emails.map((email) => (
-                    <Badge key={email} variant="secondary" className="text-xs">
-                      <Mail className="h-3 w-3 mr-1" />
-                      {email}
-                      <button
-                        onClick={() => removeEmail(email)}
-                        className="ml-1 hover:text-destructive"
+                  {emails.map((email) => {
+                    const isExisting = document?.shared_with_emails?.some(share => share.email === email);
+                    return (
+                      <Badge 
+                        key={email} 
+                        variant={isExisting ? "default" : "secondary"} 
+                        className="text-xs"
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
+                        <Mail className="h-3 w-3 mr-1" />
+                        {email}
+                        {isExisting && <span className="ml-1 text-xs opacity-75">(existing)</span>}
+                        <button
+                          onClick={() => removeEmail(email)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -375,8 +418,7 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
               disabled={isUnsharing}
               className="sm:order-2"
             >
-              <X className="h-4 w-4 mr-1" />
-              {isUnsharing ? 'Unsharing...' : 'Unshare'}
+              {isUnsharing ? 'Removing...' : 'Remove All Shares'}
             </Button>
           )}
           
@@ -386,8 +428,10 @@ export default function ShareDialog({ document, open, onOpenChange, onShare }: S
             className="sm:order-3"
           >
             <Share className="h-4 w-4 mr-2" />
-            {isSharing ? 'Creating...' : 
-             isPublic && !publicLink ? 'Generate Link' : 
+            {isSharing ? 'Updating...' : 
+             isPublic && publicLink ? 'Copy Link' : 
+             isPublic && !publicLink ? 'Generate Public Link' : 
+             emails.length > 0 ? 'Share with People' :
              'Share'}
           </Button>
         </DialogFooter>
