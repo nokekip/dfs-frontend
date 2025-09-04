@@ -258,6 +258,9 @@ export interface TeacherDashboardStats {
   documentsUploaded: number;
   documentsShared: number;
   totalDownloads: number;
+  storageUsed: number; // in MB
+  maxStorage: number; // in MB  
+  storagePercentage: number; // percentage used
   recentDocuments: Document[];
   recentActivity: ActivityLog[];
   categoryBreakdown: Array<{

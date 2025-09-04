@@ -2531,17 +2531,38 @@ export class ApiClient {
   }
 
   // System Settings Methods
-  async getPublicSettings(): Promise<ApiResponse<any>> {
+  async getBasicPublicSettings(): Promise<ApiResponse<any>> {
     try {
-      const token = localStorage.getItem(config.auth.tokenKey);
-      if (!token) {
-        throw new ApiError('No authentication token found', 401);
+      const response = await fetch(`${config.api.baseUrl}/settings/public/basic/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
       }
 
+      const data = await response.json();
+      return {
+        success: true,
+        data: data.data,
+        message: 'Basic public settings retrieved successfully',
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch basic public settings', 500);
+    }
+  }
+
+  async getPublicSettings(): Promise<ApiResponse<any>> {
+    try {
       const response = await fetch(`${config.api.baseUrl}/settings/public/`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });

@@ -279,11 +279,13 @@ export default function TeacherDashboard() {
               <HardDrive className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">245 MB</div>
+              <div className="text-2xl font-bold">
+                {(stats as any)?.storageUsed ? `${(stats as any).storageUsed} MB` : '0 MB'}
+              </div>
               <div className="mt-2 space-y-1">
-                <Progress value={24} className="h-2" />
+                <Progress value={(stats as any)?.storagePercentage || 0} className="h-2" />
                 <p className="text-xs text-muted-foreground">
-                  245 MB of 1024 MB used
+                  {(stats as any)?.storageUsed || 0} MB of {(stats as any)?.maxStorage || 1024} MB used
                 </p>
               </div>
             </CardContent>

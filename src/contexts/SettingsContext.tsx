@@ -27,11 +27,12 @@ interface SettingsProviderProps {
 
 export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [basicSettings, setBasicSettings] = useState<{ siteName?: string; registrationEnabled?: boolean } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
   const refreshSettings = async () => {
-    // Only fetch settings if user is admin
+    // Only fetch full settings if user is admin
     if (!user || user.role !== 'admin') {
       setIsLoading(false);
       return;
@@ -51,8 +52,22 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
     }
   };
 
+  const loadBasicSettings = async () => {
+    try {
+      const response = await apiClient.getPublicSettings();
+      if (response.success && response.data) {
+        setBasicSettings({
+          siteName: response.data.site_name,
+          registrationEnabled: response.data.registration_enabled
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load basic settings');
+    }
+  };
+
   const getSiteName = () => {
-    return systemSettings?.siteName || 'Digital Filing System for Teachers';
+    return systemSettings?.siteName || basicSettings?.siteName || 'Digital Filing System for Teachers';
   };
 
   const getSiteDescription = () => {
@@ -61,12 +76,16 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 
   // Update document title when settings change
   useEffect(() => {
-    if (systemSettings?.siteName) {
-      document.title = `${systemSettings.siteName} - Teachers`;
-    }
-  }, [systemSettings?.siteName]);
+    const siteName = getSiteName();
+    document.title = `${siteName} - Teachers`;
+  }, [systemSettings?.siteName, basicSettings?.siteName]);
 
-  // Load settings on mount and when user changes
+  // Load basic settings on mount (for everyone)
+  useEffect(() => {
+    loadBasicSettings();
+  }, []);
+
+  // Load full settings when user changes (for admins)
   useEffect(() => {
     if (user) {
       refreshSettings();
