@@ -21,7 +21,7 @@ export default function Login() {
   const [otpMessage, setOtpMessage] = useState('');
   const [userId, setUserId] = useState(''); // Store user ID for OTP verification
   
-  const { login, verifyOTP, isLoading } = useAuth();
+  const { login, verifyOTP, isLoginLoading } = useAuth();
   const { getSiteName } = useGlobalSettings();
   const navigate = useNavigate();
 
@@ -182,10 +182,10 @@ export default function Login() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={isLoginLoading}
                 size="lg"
               >
-                {isLoading ? (
+                {isLoginLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {showOTP ? 'Verifying...' : 'Signing In...'}

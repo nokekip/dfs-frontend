@@ -5,6 +5,8 @@ import { useAuth as useAuthHook } from '../hooks/useAuth';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isLoginLoading: boolean;
+  isLogoutLoading: boolean;
   isAuthenticated: boolean;
   pendingOtpUser: User | null;
   login: (email: string, password: string) => Promise<{ requiresOtp: boolean; message?: string; user?: User }>;
@@ -72,6 +74,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value: AuthContextType = {
     user: authHook.user,
     isLoading: authHook.isLoading,
+    isLoginLoading: authHook.isLoginLoading,
+    isLogoutLoading: authHook.isLogoutLoading,
     isAuthenticated: authHook.isAuthenticated,
     pendingOtpUser: authHook.pendingOtpUser,
     login,

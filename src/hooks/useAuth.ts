@@ -18,7 +18,9 @@ import { mockDataStore } from '../services/mockData';
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
+  isLoading: boolean; // General loading state (for initial auth check)
+  isLoginLoading: boolean; // Specific to login operations
+  isLogoutLoading: boolean; // Specific to logout operations
   error: string | null;
   pendingOtpUser: User | null; // Store user info during OTP flow
 }
@@ -29,7 +31,7 @@ interface AuthActions {
   verifyOTP: (data: OTPVerificationRequest) => Promise<boolean>;
   logout: () => Promise<void>;
   forgotPassword: (data: PasswordResetRequest) => Promise<boolean>;
-  updateProfile: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<void>;
+  updateProfile: (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }) => Promise<boolean>;
   refreshUser: () => void;
   clearError: () => void;
 }
@@ -39,6 +41,8 @@ export const useAuth = (): AuthState & AuthActions => {
     user: null,
     isAuthenticated: false,
     isLoading: true,
+    isLoginLoading: false,
+    isLogoutLoading: false,
     error: null,
     pendingOtpUser: null,
   });
@@ -56,6 +60,8 @@ export const useAuth = (): AuthState & AuthActions => {
             user,
             isAuthenticated: true,
             isLoading: false,
+            isLoginLoading: false,
+            isLogoutLoading: false,
             error: null,
             pendingOtpUser: null,
           });
@@ -79,7 +85,7 @@ export const useAuth = (): AuthState & AuthActions => {
   }, []);
 
   const login = useCallback(async (credentials: LoginRequest): Promise<{ requiresOtp: boolean; message?: string; user?: User }> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState(prev => ({ ...prev, isLoginLoading: true, error: null }));
 
     try {
       const response = await apiClient.login(credentials);
@@ -89,7 +95,7 @@ export const useAuth = (): AuthState & AuthActions => {
         if (response.data.requiresOtp) {
           setState(prev => ({
             ...prev,
-            isLoading: false,
+            isLoginLoading: false,
             pendingOtpUser: response.data.user,
           }));
 
@@ -106,6 +112,8 @@ export const useAuth = (): AuthState & AuthActions => {
             user: response.data.user,
             isAuthenticated: true,
             isLoading: false,
+            isLoginLoading: false,
+            isLogoutLoading: false,
             error: null,
             pendingOtpUser: null,
           });
@@ -118,7 +126,7 @@ export const useAuth = (): AuthState & AuthActions => {
         }
       }
 
-      setState(prev => ({ ...prev, isLoading: false }));
+      setState(prev => ({ ...prev, isLoginLoading: false }));
       return { requiresOtp: false };
     } catch (error) {
       const errorMessage = error instanceof ApiError 
@@ -127,7 +135,7 @@ export const useAuth = (): AuthState & AuthActions => {
 
       setState(prev => ({
         ...prev,
-        isLoading: false,
+        isLoginLoading: false,
         error: errorMessage,
         pendingOtpUser: null,
       }));
@@ -221,7 +229,7 @@ export const useAuth = (): AuthState & AuthActions => {
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
-    setState(prev => ({ ...prev, isLoading: true }));
+    setState(prev => ({ ...prev, isLogoutLoading: true }));
 
     try {
       await apiClient.logout();
@@ -230,6 +238,8 @@ export const useAuth = (): AuthState & AuthActions => {
         user: null,
         isAuthenticated: false,
         isLoading: false,
+        isLoginLoading: false,
+        isLogoutLoading: false,
         error: null,
         pendingOtpUser: null,
       });
@@ -246,6 +256,8 @@ export const useAuth = (): AuthState & AuthActions => {
         user: null,
         isAuthenticated: false,
         isLoading: false,
+        isLoginLoading: false,
+        isLogoutLoading: false,
         error: null,
         pendingOtpUser: null,
       });
@@ -290,7 +302,7 @@ export const useAuth = (): AuthState & AuthActions => {
     }
   }, []);
 
-  const updateProfile = useCallback(async (data: Partial<User> & { profilePictureFile?: File }): Promise<boolean> => {
+  const updateProfile = useCallback(async (data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }): Promise<boolean> => {
     if (!state.user) return false;
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
