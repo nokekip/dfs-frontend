@@ -14,7 +14,9 @@ import {
   Shield, 
   Save,
   CheckCircle,
-  Loader2
+  Loader2,
+  Lock,
+  AlertTriangle
 } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { toast } from 'sonner';
@@ -47,6 +49,9 @@ export default function AdminSettings() {
     enableAuditLogs: false
   });
 
+  // Track if user tried to interact with audit logs
+  const [showAuditWarning, setShowAuditWarning] = useState(false);
+
   // Update local state when settings are loaded
   useEffect(() => {
     if (systemSettings) {
@@ -69,7 +74,7 @@ export default function AdminSettings() {
     if (securitySettings) {
       setLocalSecuritySettings({
         twoFactorRequired: securitySettings.twoFactorRequired !== undefined ? securitySettings.twoFactorRequired : false,
-        enableAuditLogs: securitySettings.enableAuditLogs !== undefined ? securitySettings.enableAuditLogs : false
+        enableAuditLogs: true // Always force audit logs to be enabled
       });
     }
   }, [securitySettings]);
@@ -105,7 +110,7 @@ export default function AdminSettings() {
     try {
       const updatedSettings = {
         twoFactorRequired: localSecuritySettings.twoFactorRequired,
-        enableAuditLogs: localSecuritySettings.enableAuditLogs
+        enableAuditLogs: true // Always force audit logs to be enabled
       };
 
       const success = await updateSecuritySettings(updatedSettings);
@@ -116,6 +121,15 @@ export default function AdminSettings() {
     } catch (error) {
       toast.error('Failed to save security settings');
     }
+  };
+
+  const handleAuditLogsInteraction = () => {
+    setShowAuditWarning(true);
+    toast.warning('Security Policy', {
+      description: 'Audit logs cannot be disabled for security and compliance purposes.',
+    });
+    // Auto-hide the warning after 5 seconds
+    setTimeout(() => setShowAuditWarning(false), 5000);
   };
 
   if (isLoading || !systemSettings) {
@@ -288,6 +302,15 @@ export default function AdminSettings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {showAuditWarning && (
+                  <Alert className="border-warning bg-warning/10">
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                    <AlertDescription className="text-warning-foreground">
+                      <strong>Security Policy:</strong> Audit logs are permanently enabled and cannot be disabled for security and compliance purposes.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
@@ -302,17 +325,29 @@ export default function AdminSettings() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-3 rounded-lg border-2 border-dashed border-muted bg-muted/20">
                     <div className="space-y-1">
-                      <Label>Enable Audit Logs</Label>
+                      <div className="flex items-center gap-2">
+                        <Label>Enable Audit Logs</Label>
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         Log all system activities for security monitoring
                       </p>
+                      <p className="text-xs text-orange-600 font-medium">
+                        ⚠️ Permanently enabled for security compliance
+                      </p>
                     </div>
-                    <Switch
-                      checked={localSecuritySettings.enableAuditLogs}
-                      onCheckedChange={(checked) => setLocalSecuritySettings(prev => ({ ...prev, enableAuditLogs: checked }))}
-                    />
+                    <div 
+                      className="relative cursor-not-allowed"
+                      onClick={handleAuditLogsInteraction}
+                    >
+                      <Switch
+                        checked={true}
+                        disabled={true}
+                        className="opacity-75"
+                      />
+                    </div>
                   </div>
                 </div>
 
