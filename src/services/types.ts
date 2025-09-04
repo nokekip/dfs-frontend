@@ -24,6 +24,33 @@ export interface User {
   bio?: string; // Added to match Django backend
 }
 
+export interface UserPreferences {
+  id: string;
+  two_factor_enabled: boolean;
+  session_timeout_override?: number; // minutes
+  email_notifications: boolean;
+  document_shared_notifications: boolean;
+  system_notifications: boolean;
+  security_notifications: boolean;
+  created_at: string;
+  updated_at: string;
+  // System context fields
+  is_2fa_user_controllable: boolean;
+  effective_2fa_setting: boolean;
+  effective_session_timeout: number;
+  max_allowed_session_timeout: number;
+}
+
+export interface ProfileResponse {
+  user: User;
+  preferences: UserPreferences;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
 export interface AuthTokens {
   access: string;
   refresh: string;

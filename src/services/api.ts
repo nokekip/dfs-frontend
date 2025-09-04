@@ -7,6 +7,9 @@ import { config } from '../lib/config';
 import { 
   ApiResponse, 
   User, 
+  UserPreferences,
+  ProfileResponse,
+  ChangePasswordRequest,
   LoginRequest, 
   LoginResponse, 
   RegisterRequest,
@@ -525,7 +528,7 @@ export class ApiClient {
   }
 
   // Profile Methods
-  async getProfile(): Promise<ApiResponse<User>> {
+  async getProfile(): Promise<ApiResponse<ProfileResponse>> {
     try {
       const accessToken = localStorage.getItem(config.auth.tokenKey);
       if (!accessToken) {
@@ -553,27 +556,85 @@ export class ApiClient {
         throw new ApiError(data.error || 'Failed to get profile', response.status);
       }
 
-      const user: User = {
-        id: data.id,
-        email: data.email,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        role: data.role,
-        username: data.username,
-        isActive: data.is_active,
-        dateJoined: data.date_joined,
-        lastLogin: data.last_login,
-        profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}?t=${Date.now()}` : undefined,
-        phoneNumber: data.phone_number,
-        bio: data.bio,
-      };
+      // Handle both old and new API response formats
+      let user: User;
+      let preferences: UserPreferences;
+
+      if (data.user && data.preferences) {
+        // New format with user and preferences
+        user = {
+          id: data.user.id,
+          email: data.user.email,
+          firstName: data.user.first_name,
+          lastName: data.user.last_name,
+          role: data.user.role,
+          username: data.user.username,
+          isActive: data.user.is_active,
+          dateJoined: data.user.date_joined,
+          lastLogin: data.user.last_login,
+          profilePicture: data.user.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.user.profile_picture}?t=${Date.now()}` : undefined,
+          phoneNumber: data.user.phone_number,
+          bio: data.user.bio,
+        };
+
+        preferences = {
+          id: data.preferences.id,
+          two_factor_enabled: data.preferences.two_factor_enabled,
+          session_timeout_override: data.preferences.session_timeout_override,
+          email_notifications: data.preferences.email_notifications,
+          document_shared_notifications: data.preferences.document_shared_notifications,
+          system_notifications: data.preferences.system_notifications,
+          security_notifications: data.preferences.security_notifications,
+          created_at: data.preferences.created_at,
+          updated_at: data.preferences.updated_at,
+          is_2fa_user_controllable: data.preferences.is_2fa_user_controllable,
+          effective_2fa_setting: data.preferences.effective_2fa_setting,
+          effective_session_timeout: data.preferences.effective_session_timeout,
+          max_allowed_session_timeout: data.preferences.max_allowed_session_timeout,
+        };
+      } else {
+        // Old format - just user data
+        user = {
+          id: data.id,
+          email: data.email,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          role: data.role,
+          username: data.username,
+          isActive: data.is_active,
+          dateJoined: data.date_joined,
+          lastLogin: data.last_login,
+          profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}?t=${Date.now()}` : undefined,
+          phoneNumber: data.phone_number,
+          bio: data.bio,
+        };
+
+        // Default preferences for backwards compatibility
+        preferences = {
+          id: '0',
+          two_factor_enabled: true,
+          session_timeout_override: undefined,
+          email_notifications: true,
+          document_shared_notifications: true,
+          system_notifications: true,
+          security_notifications: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_2fa_user_controllable: true,
+          effective_2fa_setting: true,
+          effective_session_timeout: 30,
+          max_allowed_session_timeout: 30,
+        };
+      }
+
+      const profileResponse: ProfileResponse = { user, preferences };
 
       // Update cached user data
       localStorage.setItem(config.auth.userKey, JSON.stringify(user));
 
       return {
         success: true,
-        data: user,
+        data: profileResponse,
         message: 'Profile retrieved successfully',
       };
 
@@ -594,15 +655,46 @@ export class ApiClient {
     }
   }
 
-  async updateProfile(data: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }): Promise<ApiResponse<User>> {
+  async updateProfile(data: { 
+    user?: Partial<User> & { profilePictureFile?: File; removeProfilePicture?: boolean }; 
+    preferences?: Partial<UserPreferences>;
+  }): Promise<ApiResponse<ProfileResponse>> {
     try {
       const accessToken = localStorage.getItem(config.auth.tokenKey);
       if (!accessToken) {
         throw new ApiError('Authentication required', 401);
       }
 
-      // Determine if we need to use FormData (for file uploads/removal) or JSON
-      const hasFileUpload = data.profilePictureFile instanceof File || data.removeProfilePicture;
+      // Prepare request data for new API format
+      const requestData: any = {};
+
+      // Handle user data
+      if (data.user) {
+        const userData: any = {};
+        if (data.user.firstName !== undefined) userData.first_name = data.user.firstName;
+        if (data.user.lastName !== undefined) userData.last_name = data.user.lastName;
+        if (data.user.email !== undefined) userData.email = data.user.email;
+        if (data.user.phoneNumber !== undefined) userData.phone_number = data.user.phoneNumber;
+        if (data.user.bio !== undefined) userData.bio = data.user.bio;
+        
+        requestData.user = userData;
+      }
+
+      // Handle preferences data
+      if (data.preferences) {
+        const preferencesData: any = {};
+        if (data.preferences.two_factor_enabled !== undefined) preferencesData.two_factor_enabled = data.preferences.two_factor_enabled;
+        if (data.preferences.session_timeout_override !== undefined) preferencesData.session_timeout_override = data.preferences.session_timeout_override;
+        if (data.preferences.email_notifications !== undefined) preferencesData.email_notifications = data.preferences.email_notifications;
+        if (data.preferences.document_shared_notifications !== undefined) preferencesData.document_shared_notifications = data.preferences.document_shared_notifications;
+        if (data.preferences.system_notifications !== undefined) preferencesData.system_notifications = data.preferences.system_notifications;
+        if (data.preferences.security_notifications !== undefined) preferencesData.security_notifications = data.preferences.security_notifications;
+        
+        requestData.preferences = preferencesData;
+      }
+
+      // Check if we need FormData for file upload
+      const hasFileUpload = data.user?.profilePictureFile instanceof File || data.user?.removeProfilePicture;
       
       let requestBody: FormData | string;
       let headers: Record<string, string> = {
@@ -610,34 +702,34 @@ export class ApiClient {
       };
 
       if (hasFileUpload) {
-        // Use FormData for file uploads or removal
+        // Use FormData for file uploads
         const formData = new FormData();
         
-        if (data.firstName !== undefined) formData.append('first_name', data.firstName);
-        if (data.lastName !== undefined) formData.append('last_name', data.lastName);
-        if (data.email !== undefined) formData.append('email', data.email);
-        if (data.phoneNumber !== undefined) formData.append('phone_number', data.phoneNumber);
-        if (data.bio !== undefined) formData.append('bio', data.bio);
+        // Add user data to FormData
+        if (requestData.user) {
+          Object.keys(requestData.user).forEach(key => {
+            formData.append(`user.${key}`, requestData.user[key]);
+          });
+        }
         
-        if (data.profilePictureFile) {
-          formData.append('profile_picture', data.profilePictureFile);
-        } else if (data.removeProfilePicture) {
-          // Send empty string to clear the profile picture
-          formData.append('profile_picture', '');
+        // Add preferences data to FormData
+        if (requestData.preferences) {
+          Object.keys(requestData.preferences).forEach(key => {
+            formData.append(`preferences.${key}`, requestData.preferences[key]);
+          });
+        }
+        
+        if (data.user?.profilePictureFile) {
+          formData.append('user.profile_picture', data.user.profilePictureFile);
+        } else if (data.user?.removeProfilePicture) {
+          formData.append('user.remove_profile_picture', 'true');
         }
         
         requestBody = formData;
-        // Don't set Content-Type header - let browser set it with boundary for FormData
+        // Don't set Content-Type for FormData
       } else {
-        // Use JSON for regular updates
-        const backendData: any = {};
-        if (data.firstName !== undefined) backendData.first_name = data.firstName;
-        if (data.lastName !== undefined) backendData.last_name = data.lastName;
-        if (data.email !== undefined) backendData.email = data.email;
-        if (data.phoneNumber !== undefined) backendData.phone_number = data.phoneNumber;
-        if (data.bio !== undefined) backendData.bio = data.bio;
-        
-        requestBody = JSON.stringify(backendData);
+        // Use JSON
+        requestBody = JSON.stringify(requestData);
         headers['Content-Type'] = 'application/json';
       }
 
@@ -652,35 +744,53 @@ export class ApiClient {
 
       if (!response.ok) {
         if (response.status === 401) {
-          // Token might be expired, clear auth state
           localStorage.removeItem(config.auth.tokenKey);
           localStorage.removeItem(config.auth.refreshTokenKey);
           localStorage.removeItem(config.auth.userKey);
         }
-        throw new ApiError(responseData.error || 'Failed to update profile', response.status);
+        throw new ApiError(responseData.error || responseData.detail || 'Failed to update profile', response.status);
       }
 
-      const updatedUser: User = {
-        id: responseData.id,
-        email: responseData.email,
-        firstName: responseData.first_name,
-        lastName: responseData.last_name,
-        role: responseData.role,
-        username: responseData.username,
-        isActive: responseData.is_active,
-        dateJoined: responseData.date_joined,
-        lastLogin: responseData.last_login,
-        profilePicture: responseData.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${responseData.profile_picture}?t=${Date.now()}` : undefined,
-        phoneNumber: responseData.phone_number,
-        bio: responseData.bio,
+      // Parse response - should match ProfileResponse format
+      const user: User = {
+        id: responseData.user.id,
+        email: responseData.user.email,
+        firstName: responseData.user.first_name,
+        lastName: responseData.user.last_name,
+        role: responseData.user.role,
+        username: responseData.user.username,
+        isActive: responseData.user.is_active,
+        dateJoined: responseData.user.date_joined,
+        lastLogin: responseData.user.last_login,
+        profilePicture: responseData.user.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${responseData.user.profile_picture}?t=${Date.now()}` : undefined,
+        phoneNumber: responseData.user.phone_number,
+        bio: responseData.user.bio,
       };
 
+      const preferences: UserPreferences = {
+        id: responseData.preferences.id,
+        two_factor_enabled: responseData.preferences.two_factor_enabled,
+        session_timeout_override: responseData.preferences.session_timeout_override,
+        email_notifications: responseData.preferences.email_notifications,
+        document_shared_notifications: responseData.preferences.document_shared_notifications,
+        system_notifications: responseData.preferences.system_notifications,
+        security_notifications: responseData.preferences.security_notifications,
+        created_at: responseData.preferences.created_at,
+        updated_at: responseData.preferences.updated_at,
+        is_2fa_user_controllable: responseData.preferences.is_2fa_user_controllable,
+        effective_2fa_setting: responseData.preferences.effective_2fa_setting,
+        effective_session_timeout: responseData.preferences.effective_session_timeout,
+        max_allowed_session_timeout: responseData.preferences.max_allowed_session_timeout,
+      };
+
+      const profileResponse: ProfileResponse = { user, preferences };
+
       // Update cached user data
-      localStorage.setItem(config.auth.userKey, JSON.stringify(updatedUser));
+      localStorage.setItem(config.auth.userKey, JSON.stringify(user));
 
       return {
         success: true,
-        data: updatedUser,
+        data: profileResponse,
         message: 'Profile updated successfully',
       };
 
@@ -698,6 +808,57 @@ export class ApiClient {
       }
 
       throw new ApiError('An unexpected error occurred while updating profile', 500);
+    }
+  }
+
+  async changePassword(data: ChangePasswordRequest): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const accessToken = localStorage.getItem(config.auth.tokenKey);
+      if (!accessToken) {
+        throw new ApiError('Authentication required', 401);
+      }
+
+      const response = await fetch(`${config.api.baseUrl}/accounts/auth/change-password/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(data),
+        signal: AbortSignal.timeout(config.api.timeout),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem(config.auth.tokenKey);
+          localStorage.removeItem(config.auth.refreshTokenKey);
+          localStorage.removeItem(config.auth.userKey);
+        }
+        throw new ApiError(responseData.error || responseData.detail || 'Failed to change password', response.status);
+      }
+
+      return {
+        success: true,
+        data: { message: responseData.message || 'Password changed successfully' },
+        message: responseData.message || 'Password changed successfully',
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new ApiError('Unable to connect to server. Please check your connection.', 503);
+      }
+      
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ApiError('Request timeout. Please try again.', 408);
+      }
+
+      throw new ApiError('An unexpected error occurred while changing password', 500);
     }
   }
 

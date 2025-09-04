@@ -60,7 +60,7 @@ export const useAuth = (): AuthState & AuthActions => {
             if (response.success && response.data) {
               console.log('Profile data fetched successfully:', response.data);
               setState({
-                user: response.data,
+                user: response.data.user, // Extract user from ProfileResponse
                 isAuthenticated: true,
                 isLoading: false,
                 isLoginLoading: false,
@@ -236,7 +236,7 @@ export const useAuth = (): AuthState & AuthActions => {
             console.log('Fetched profile data after OTP:', profileResponse.data);
             setState(prev => ({
               ...prev,
-              user: profileResponse.data,
+              user: profileResponse.data.user, // Extract user from ProfileResponse
             }));
           }
         } catch (profileError) {
@@ -352,12 +352,17 @@ export const useAuth = (): AuthState & AuthActions => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await apiClient.updateProfile(data);
+      // Transform data for new API structure
+      const updateData = {
+        user: data
+      };
+
+      const response = await apiClient.updateProfile(updateData);
       
       if (response.success && response.data) {
         setState(prev => ({
           ...prev,
-          user: response.data,
+          user: response.data.user, // Extract user from ProfileResponse
           isLoading: false,
         }));
 
@@ -371,7 +376,7 @@ export const useAuth = (): AuthState & AuthActions => {
             try {
               const refreshResponse = await apiClient.getProfile();
               if (refreshResponse.success && refreshResponse.data) {
-                setState(prev => ({ ...prev, user: refreshResponse.data }));
+                setState(prev => ({ ...prev, user: refreshResponse.data.user }));
               }
             } catch (error) {
               console.warn('Failed to refresh profile after image update:', error);
@@ -409,7 +414,7 @@ export const useAuth = (): AuthState & AuthActions => {
     try {
       const response = await apiClient.getProfile();
       if (response.success && response.data) {
-        setState(prev => ({ ...prev, user: response.data }));
+        setState(prev => ({ ...prev, user: response.data.user })); // Extract user from ProfileResponse
       }
     } catch (error) {
       console.warn('Failed to refresh user profile:', error);

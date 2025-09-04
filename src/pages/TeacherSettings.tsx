@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import useUserPreferences from '../hooks/useUserPreferences';
+import usePasswordChange from '../hooks/usePasswordChange';
 import Layout from '../components/Layout';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -70,13 +72,15 @@ interface NotificationSettings {
 
 export default function TeacherSettings() {
   const { user, updateUser } = useAuth();
+  const { preferences, updatePreferences, isLoading: preferencesLoading } = useUserPreferences();
+  const { changePassword, isLoading: passwordLoading } = usePasswordChange();
   
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    phoneNumber: '+254 712 345 678',
-    bio: 'Passionate educator with 8 years of experience in primary education.',
+    phoneNumber: user?.phoneNumber || '',
+    bio: user?.bio || '',
     profilePicture: user?.profilePicture || undefined,
     profilePictureFile: undefined,
     profilePicturePreview: undefined,
@@ -87,13 +91,13 @@ export default function TeacherSettings() {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    twoFactorEnabled: true,
-    sessionTimeout: 30,
+    twoFactorEnabled: preferences?.two_factor_enabled || true,
+    sessionTimeout: preferences?.session_timeout_override || preferences?.effective_session_timeout || 30,
   });
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    emailNotifications: true,
-    documentShared: true,
+    emailNotifications: preferences?.email_notifications || true,
+    documentShared: preferences?.document_shared_notifications || true,
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -109,10 +113,29 @@ export default function TeacherSettings() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
+        phoneNumber: user.phoneNumber || '',
+        bio: user.bio || '',
         profilePicture: user.profilePicture || undefined,
       }));
     }
   }, [user]);
+
+  // Sync preferences with local state
+  useEffect(() => {
+    if (preferences) {
+      setSecuritySettings(prev => ({
+        ...prev,
+        twoFactorEnabled: preferences.two_factor_enabled,
+        sessionTimeout: preferences.session_timeout_override || preferences.effective_session_timeout,
+      }));
+
+      setNotificationSettings(prev => ({
+        ...prev,
+        emailNotifications: preferences.email_notifications,
+        documentShared: preferences.document_shared_notifications,
+      }));
+    }
+  }, [preferences]);
 
   // Update profile picture when user.profilePicture changes specifically  
   useEffect(() => {
@@ -131,6 +154,8 @@ export default function TeacherSettings() {
         firstName: profileData.firstName,
         lastName: profileData.lastName,
         email: profileData.email,
+        phoneNumber: profileData.phoneNumber,
+        bio: profileData.bio,
       };
 
       // Handle profile picture changes
@@ -153,13 +178,8 @@ export default function TeacherSettings() {
         removeExistingPicture: false,
       }));
       
-      toast.success('Profile Updated', {
-        description: 'Your profile information has been saved successfully'
-      });
     } catch (error) {
-      toast.error('Update Failed', {
-        description: 'Failed to update profile. Please try again.'
-      });
+      console.error('Profile update error:', error);
     }
   };
 
@@ -177,29 +197,61 @@ export default function TeacherSettings() {
     }
 
     try {
-      // In real app, this would update password via Django REST API
-      setSecuritySettings(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      }));
-      
-      toast.success('Password Changed', {
-        description: 'Your password has been updated successfully'
+      const success = await changePassword({
+        current_password: securitySettings.currentPassword,
+        new_password: securitySettings.newPassword,
       });
+
+      if (success) {
+        setSecuritySettings(prev => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        }));
+      }
     } catch (error) {
-      toast.error('Password Change Failed', {
-        description: 'Failed to change password. Please try again.'
-      });
+      console.error('Password change error:', error);
     }
   };
 
-  const handleNotificationsSave = () => {
-    // In real app, this would save via Django REST API
-    toast.success('Settings Saved', {
-      description: 'Your notification preferences have been updated'
-    });
+  const handleSecuritySave = async () => {
+    if (!preferences) return;
+
+    try {
+      const maxTimeout = preferences.max_allowed_session_timeout;
+      const effectiveTimeout = Math.min(securitySettings.sessionTimeout, maxTimeout);
+
+      await updatePreferences({
+        two_factor_enabled: securitySettings.twoFactorEnabled,
+        session_timeout_override: effectiveTimeout,
+      });
+
+      // Update local state to reflect any adjustments
+      if (effectiveTimeout !== securitySettings.sessionTimeout) {
+        setSecuritySettings(prev => ({
+          ...prev,
+          sessionTimeout: effectiveTimeout,
+        }));
+        
+        toast.warning('Session Timeout Adjusted', {
+          description: `Session timeout was adjusted to the maximum allowed: ${maxTimeout} minutes`,
+        });
+      }
+    } catch (error) {
+      console.error('Security settings update error:', error);
+    }
+  };
+
+  const handleNotificationsSave = async () => {
+    try {
+      await updatePreferences({
+        email_notifications: notificationSettings.emailNotifications,
+        document_shared_notifications: notificationSettings.documentShared,
+      });
+    } catch (error) {
+      console.error('Notification settings update error:', error);
+    }
   };
 
   const handleChangePhoto = () => {
@@ -472,8 +524,11 @@ export default function TeacherSettings() {
                       </div>
                     </div>
                   </div>
-                  <Button onClick={handlePasswordChange}>
-                    Change Password
+                  <Button 
+                    onClick={handlePasswordChange} 
+                    disabled={passwordLoading || !securitySettings.currentPassword || !securitySettings.newPassword || !securitySettings.confirmPassword}
+                  >
+                    {passwordLoading ? 'Changing Password...' : 'Change Password'}
                   </Button>
                 </div>
 
@@ -482,21 +537,32 @@ export default function TeacherSettings() {
                   <h3 className="text-lg font-medium">Two-Factor Authentication</h3>
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="font-medium">SMS Authentication</p>
+                      <p className="font-medium">Email Authentication</p>
                       <p className="text-sm text-muted-foreground">
-                        Receive verification codes via SMS
+                        Receive verification codes via email
                       </p>
                     </div>
                     <Switch
                       checked={securitySettings.twoFactorEnabled}
                       onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, twoFactorEnabled: checked }))}
+                      disabled={!preferences?.is_2fa_user_controllable || preferencesLoading}
                     />
                   </div>
-                  {securitySettings.twoFactorEnabled && (
+
+                  {!preferences?.is_2fa_user_controllable && (
+                    <Alert className="bg-warning/10 border-warning/20">
+                      <Shield className="h-4 w-4 text-warning" />
+                      <AlertDescription className="text-warning-foreground">
+                        Two-factor authentication is required by system policy and cannot be disabled.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {securitySettings.twoFactorEnabled && preferences?.is_2fa_user_controllable && (
                     <Alert className="bg-success/10 border-success/20">
                       <Shield className="h-4 w-4 text-success" />
                       <AlertDescription className="text-success-foreground">
-                        Two-factor authentication is enabled. Your account is secured with SMS verification.
+                        Two-factor authentication is enabled. Your account is secured with email verification.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -507,22 +573,39 @@ export default function TeacherSettings() {
                   <h3 className="text-lg font-medium">Session Management</h3>
                   <div className="space-y-2">
                     <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                    <Select
-                      value={securitySettings.sessionTimeout.toString()}
-                      onValueChange={(value) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: parseInt(value) }))}
-                    >
-                      <SelectTrigger className="max-w-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="15">15 minutes</SelectItem>
-                        <SelectItem value="30">30 minutes</SelectItem>
-                        <SelectItem value="60">1 hour</SelectItem>
-                        <SelectItem value="120">2 hours</SelectItem>
-                        <SelectItem value="0">Never</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Input
+                        type="number"
+                        min={5}
+                        max={preferences?.max_allowed_session_timeout || 480}
+                        value={securitySettings.sessionTimeout}
+                        onChange={(e) => {
+                          const value = Math.min(
+                            Math.max(5, parseInt(e.target.value) || 5),
+                            preferences?.max_allowed_session_timeout || 480
+                          );
+                          setSecuritySettings(prev => ({ ...prev, sessionTimeout: value }));
+                        }}
+                        className="max-w-xs"
+                        disabled={preferencesLoading}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Maximum allowed: {preferences?.max_allowed_session_timeout || 30} minutes (set by administrator)
+                      </p>
+                    </div>
                   </div>
+                </div>
+
+                {/* Save Security Settings Button */}
+                <div className="flex justify-end pt-4 border-t">
+                  <Button 
+                    onClick={handleSecuritySave}
+                    disabled={preferencesLoading}
+                    className="w-full md:w-auto"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {preferencesLoading ? 'Saving...' : 'Save Security Settings'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -579,9 +662,13 @@ export default function TeacherSettings() {
                   </div>
                 </div>
 
-                <Button onClick={handleNotificationsSave}>
+                <Button 
+                  onClick={handleNotificationsSave}
+                  disabled={preferencesLoading}
+                  className="w-full md:w-auto"
+                >
                   <Save className="h-4 w-4 mr-2" />
-                  Save Preferences
+                  {preferencesLoading ? 'Saving...' : 'Save Preferences'}
                 </Button>
               </CardContent>
             </Card>
