@@ -212,7 +212,7 @@ export const useAuth = (): AuthState & AuthActions => {
   }, []);
 
   const verifyOTP = useCallback(async (data: OTPVerificationRequest): Promise<boolean> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState(prev => ({ ...prev, isLoginLoading: true, error: null }));
 
     try {
       const response = await apiClient.verifyOTP(data);
@@ -251,7 +251,7 @@ export const useAuth = (): AuthState & AuthActions => {
         return true;
       }
 
-      setState(prev => ({ ...prev, isLoading: false }));
+      setState(prev => ({ ...prev, isLoginLoading: false }));
       return false;
     } catch (error) {
       const errorMessage = error instanceof ApiError 
@@ -260,7 +260,7 @@ export const useAuth = (): AuthState & AuthActions => {
 
       setState(prev => ({
         ...prev,
-        isLoading: false,
+        isLoginLoading: false,
         error: errorMessage,
       }));
 
