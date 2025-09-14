@@ -102,7 +102,17 @@ export default function TeacherShared() {
   };
 
   const handlePreview = (document: any) => {
-    setPreviewFile(document);
+    // Transform the document object to match FilePreviewModal expected format
+    const transformedFile = {
+      id: document.document_id || document.id,
+      title: document.document_title || document.title,
+      fileName: document.document_file_name || document.fileName,
+      fileType: document.document_file_type || document.fileType,
+      fileSize: document.document_file_size || document.fileSize,
+      filePath: document.document_file_path || document.filePath,
+      description: document.document_description || document.description
+    };
+    setPreviewFile(transformedFile);
     setIsPreviewOpen(true);
   };
 

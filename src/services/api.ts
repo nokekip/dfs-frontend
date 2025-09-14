@@ -588,6 +588,7 @@ export class ApiClient {
           profilePicture: data.user.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.user.profile_picture}?t=${Date.now()}` : undefined,
           phoneNumber: data.user.phone_number,
           bio: data.user.bio,
+          teacherProfileId: data.user.teacher_profile_id,
         };
 
         preferences = {
@@ -620,6 +621,7 @@ export class ApiClient {
           profilePicture: data.profile_picture ? `${config.api.baseUrl.replace('/api', '')}${data.profile_picture}?t=${Date.now()}` : undefined,
           phoneNumber: data.phone_number,
           bio: data.bio,
+          teacherProfileId: data.teacher_profile_id,
         };
 
         // Default preferences for backwards compatibility

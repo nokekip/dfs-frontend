@@ -64,15 +64,18 @@ export default function FilePreviewModal({ file, isOpen, onClose }: FilePreviewM
   if (!file) return null;
 
   const isImage = (fileType: string) => {
+    if (!fileType) return false;
     const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
     return imageTypes.includes(fileType.toLowerCase());
   };
 
   const isPDF = (fileType: string) => {
+    if (!fileType) return false;
     return fileType.toLowerCase() === 'pdf';
   };
 
   const isPreviewable = (fileType: string) => {
+    if (!fileType) return false;
     return isImage(fileType) || isPDF(fileType);
   };
 
@@ -146,7 +149,7 @@ export default function FilePreviewModal({ file, isOpen, onClose }: FilePreviewM
             <div>
               <DialogTitle className="text-lg font-semibold">{file.title}</DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                {file.fileName} • {file.fileType.toUpperCase()} • {formatFileSize(file.fileSize)}
+                {file.fileName} • {(file.fileType || 'Unknown').toUpperCase()} • {formatFileSize(file.fileSize)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -216,7 +219,7 @@ export default function FilePreviewModal({ file, isOpen, onClose }: FilePreviewM
                 </div>
                 <h3 className="text-lg font-medium mb-2">Preview not available</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  This file type ({file.fileType.toUpperCase()}) cannot be previewed in the browser.
+                  This file type ({(file.fileType || 'Unknown').toUpperCase()}) cannot be previewed in the browser.
                 </p>
                 <Button onClick={handleDownload}>
                   <Download className="h-4 w-4 mr-2" />

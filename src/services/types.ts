@@ -22,6 +22,7 @@ export interface User {
   username?: string; // Added to match Django backend
   phoneNumber?: string; // Added to match Django backend
   bio?: string; // Added to match Django backend
+  teacherProfileId?: number; // Teacher profile ID for filtering shares
 }
 
 export interface UserPreferences {
@@ -212,8 +213,8 @@ export interface DocumentShareRequest {
 export interface DocumentShare {
   id: string;
   document: string; // Document ID
-  shared_by: string; // Teacher ID
-  shared_with?: string; // Teacher ID for private shares
+  shared_by: number; // Teacher ID
+  shared_with?: number; // Teacher ID for private shares
   share_type: 'public' | 'private';
   share_token: string;
   can_download: boolean;

@@ -67,9 +67,9 @@ export const useDocumentShares = (): DocumentSharesState & DocumentSharesActions
               updatedAt: '',
             },
             teacher: {
-              id: share.shared_by,
+              id: share.shared_by.toString(),
               user: {
-                id: share.shared_by,
+                id: share.shared_by.toString(),
                 email: '',
                 firstName: share.shared_by_name?.split(' ')[0] || 'Unknown',
                 lastName: share.shared_by_name?.split(' ').slice(1).join(' ') || '',
@@ -105,18 +105,21 @@ export const useDocumentShares = (): DocumentSharesState & DocumentSharesActions
           };
         });
 
-        // Separate shares into categories with simplified filtering
+        // Separate shares into categories with proper filtering
         // Backend already filters to only return shares for this user's teacher profile
+        const currentUserTeacherProfileId = user?.teacherProfileId;
+        
         const sharedWithMe = sharesWithDocuments.filter(share => {
-          // Shares where this user is the recipient (private shares only)
-          const isRecipient = share.shared_with && share.is_active && share.share_type === 'private';
-          return isRecipient;
+          // Documents shared TO me (I am the recipient)
+          return share.shared_with === currentUserTeacherProfileId && 
+                 share.is_active && 
+                 share.share_type === 'private';
         });
         
         const mySharedFiles = sharesWithDocuments.filter(share => {
-          // Shares where this user is the creator
-          const isCreator = share.shared_by && share.is_active;
-          return isCreator;
+          // Documents shared BY me (I am the creator)
+          return share.shared_by === currentUserTeacherProfileId && 
+                 share.is_active;
         });
 
         setState(prev => ({
