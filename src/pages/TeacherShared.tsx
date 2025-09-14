@@ -90,9 +90,11 @@ export default function TeacherShared() {
 
   const handleDownload = async (document: any) => {
     try {
-      await apiClient.downloadDocument(document.id);
+      // For shared documents, use document.document (the actual document ID)
+      const documentId = document.document || document.id;
+      await apiClient.downloadDocument(documentId);
       toast.success('Download Started', {
-        description: `${document.fileName || document.title} is being downloaded`
+        description: `${document.document_file_name || document.fileName || document.document_title || document.title} is being downloaded`
       });
     } catch (error) {
       toast.error('Download Failed', {
@@ -103,8 +105,9 @@ export default function TeacherShared() {
 
   const handlePreview = (document: any) => {
     // Transform the document object to match FilePreviewModal expected format
+    // For shared documents, use document.document (the actual document ID from DocumentShare)
     const transformedFile = {
-      id: document.document_id || document.id,
+      id: document.document || document.id, // document.document is the actual document ID
       title: document.document_title || document.title,
       fileName: document.document_file_name || document.fileName,
       fileType: document.document_file_type || document.fileType,
