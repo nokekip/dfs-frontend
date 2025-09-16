@@ -242,7 +242,7 @@ export default function TeacherUpload() {
   const canUploadFile = (file: UploadFile) => {
     const category = getSelectedCategory(file.category);
     return file.title && file.category && file.status !== 'error' && 
-                      (!category?.requires_class_subject || (file.class && file.subject));
+                      (!category?.requiresClassSubject || (file.class && file.subject));
   };
 
   const readyToUploadCount = uploadFiles.filter(canUploadFile).length;
@@ -446,7 +446,7 @@ export default function TeacherUpload() {
                             </Select>
                           </div>
 
-                                                    {category?.requires_class_subject && (
+                          {category?.requiresClassSubject && (
                             <>
                               <div className="space-y-2">
                                 <Label>Class *</Label>
@@ -576,7 +576,7 @@ export default function TeacherUpload() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h4 className="font-medium text-sm">{category.name}</h4>
-                          {category.requires_class_subject && (
+                          {category.requiresClassSubject && (
                             <Badge variant="outline" className="text-xs">
                               Requires Class & Subject
                             </Badge>
