@@ -74,28 +74,30 @@ export default function PublicShare() {
         fileType: responseData.file_type,
         filePath: responseData.file,
         teacher: {
-          id: responseData.teacher.id,
-          user: responseData.teacher.user,
-          employeeId: responseData.teacher.employee_id,
-          firstName: responseData.teacher.first_name,
-          lastName: responseData.teacher.last_name,
-          email: responseData.teacher.email,
-          phone: responseData.teacher.phone,
-          department: responseData.teacher.department,
-          isApproved: responseData.teacher.is_approved,
-          joinedAt: responseData.teacher.joined_at,
-          documentsCount: responseData.teacher.documents_count,
-          sharedDocumentsCount: responseData.teacher.shared_documents_count,
-          totalDownloads: responseData.teacher.total_downloads || 0,
-          status: responseData.teacher.status,
-          profilePicture: responseData.teacher.profile_picture,
-          bio: responseData.teacher.bio,
-          specialization: responseData.teacher.specialization,
-          experience: responseData.teacher.experience,
-          qualifications: responseData.teacher.qualifications,
-          createdAt: responseData.teacher.created_at,
-          updatedAt: responseData.teacher.updated_at,
+          id: responseData.teacher,
+          user: {
+            id: responseData.teacher,
+            firstName: '', // Will be derived from teacher_name
+            lastName: '',
+            email: '',
+            phone: '',
+            isActive: true,
+            isStaff: false,
+            isEmailVerified: true,
+            profilePicture: null,
+            createdAt: '',
+            updatedAt: '',
+          },
+          phoneNumber: '',
+          bio: '',
+          status: 'approved' as const,
+          documentsCount: 0,
+          sharedDocumentsCount: 0,
+          totalDownloads: 0,
+          createdAt: '',
+          updatedAt: '',
         },
+        teacherName: responseData.teacher_name,
         category: responseData.category ? {
           id: responseData.category.id,
           name: responseData.category.name,
@@ -111,7 +113,10 @@ export default function PublicShare() {
         downloadCount: responseData.download_count,
         status: responseData.status,
         isShared: responseData.is_shared,
+        sharedWith: [], // Public shares don't expose shared user IDs
         sharedAt: responseData.shared_at,
+        tags: [], // Tags not available in public view
+        shared_with_emails: [], // Emails not exposed in public view
         createdAt: responseData.created_at,
         updatedAt: responseData.updated_at,
       };
@@ -136,9 +141,8 @@ export default function PublicShare() {
     setRotation(0);
 
     try {
-      // For public shares, we can try to load the preview directly via the download endpoint
-      // This works for images and PDFs that can be displayed in browser
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/documents/documents/${documentId}/download/?token=${token}`);
+      // Use the preview endpoint instead of download endpoint for public shares
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'}/documents/documents/${documentId}/preview/?token=${token}`);
       
       if (!response.ok) {
         throw new Error('Preview failed');
@@ -165,23 +169,44 @@ export default function PublicShare() {
         throw new Error('Download failed');
       }
 
+      // Get filename from Content-Disposition header with improved parsing
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = document.fileName || 'download';
+      
+      if (contentDisposition) {
+        // Try multiple patterns to extract filename
+        const patterns = [
+          /filename\*=UTF-8''(.+)/i,  // RFC 5987 encoded filename
+          /filename="([^"]+)"/i,       // Quoted filename
+          /filename=([^;]+)/i          // Unquoted filename
+        ];
+        
+        for (const pattern of patterns) {
+          const match = contentDisposition.match(pattern);
+          if (match && match[1]) {
+            fileName = decodeURIComponent(match[1].trim());
+            break;
+          }
+        }
+      }
+
       // Get the file blob
       const blob = await response.blob();
       
-      // Create download link
+      // Create download link - use window.document explicitly to avoid naming conflict
       const url = window.URL.createObjectURL(blob);
       const link = window.document.createElement('a');
       link.href = url;
-      link.download = document.fileName;
-      document.body.appendChild(link);
+      link.download = fileName;
+      window.document.body.appendChild(link);
       link.click();
       
       // Cleanup
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
 
       toast.success('Download Started', {
-        description: `${document.fileName} is being downloaded`
+        description: `${fileName} is being downloaded`
       });
     } catch (error) {
       toast.error('Download Failed', {
@@ -363,8 +388,8 @@ export default function PublicShare() {
                 <div className="flex items-center gap-3">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="font-medium text-foreground">{document.teacher.firstName} {document.teacher.lastName}</p>
-                    <p className="text-sm text-muted-foreground">{document.teacher.department}</p>
+                    <p className="font-medium text-foreground">{document.teacherName || 'Teacher'}</p>
+                    <p className="text-sm text-muted-foreground">Educator</p>
                   </div>
                 </div>
               </div>

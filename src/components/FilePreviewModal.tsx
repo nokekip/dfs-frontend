@@ -110,7 +110,7 @@ export default function FilePreviewModal({ file, isOpen, onClose }: FilePreviewM
     if (!file) return;
     
     try {
-      await apiClient.downloadDocument(file.id);
+      await apiClient.downloadDocument(file.id, undefined, file.fileName);
       toast.success('Download Started', {
         description: `${file.fileName} is being downloaded`
       });

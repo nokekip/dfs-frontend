@@ -157,6 +157,7 @@ export interface Document {
   description?: string;
   category: DocumentCategory;
   teacher: Teacher;
+  teacherName?: string; // For public shares where full teacher data may not be available
   fileName: string;
   fileSize: number;
   fileType: string;

@@ -145,10 +145,10 @@ export default function TeacherDashboard() {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       
       // Check file type if settings are available
-      if (settings && settings.allowed_file_types) {
-        if (!fileExtension || !settings.allowed_file_types.includes(fileExtension)) {
+      if (settings && settings.allowedFileTypes) {
+        if (!fileExtension || !settings.allowedFileTypes.includes(fileExtension)) {
           toast.error('Invalid file type', {
-            description: `Please select a file with one of these extensions: ${settings.allowed_file_types.join(', ')}`
+            description: `Please select a file with one of these extensions: ${settings.allowedFileTypes.join(', ')}`
           });
           e.target.value = '';
           return;
@@ -156,10 +156,10 @@ export default function TeacherDashboard() {
       }
       
       // Check file size if settings are available
-      if (settings && settings.max_file_size) {
-        if (file.size > settings.max_file_size) {
+      if (settings && settings.maxFileSize) {
+        if (file.size > settings.maxFileSize) {
           toast.error('File too large', {
-            description: `File size must be less than ${(settings.max_file_size / (1024 * 1024)).toFixed(0)}MB`
+            description: `File size must be less than ${(settings.maxFileSize / (1024 * 1024)).toFixed(0)}MB`
           });
           e.target.value = '';
           return;
@@ -195,7 +195,7 @@ export default function TeacherDashboard() {
 
   const handleDownload = async (file: any) => {
     try {
-      await apiClient.downloadDocument(file.id);
+      await apiClient.downloadDocument(file.id, undefined, file.fileName);
       toast.success('Download Started', {
         description: `${file.fileName} is being downloaded`
       });
@@ -335,15 +335,15 @@ export default function TeacherDashboard() {
                   <Input
                     id="file"
                     type="file"
-                    accept={settings?.allowed_file_types?.map(type => `.${type}`).join(',') || '.pdf,.docx,.xlsx,.pptx,.jpg,.png'}
+                    accept={settings?.allowedFileTypes?.map(type => `.${type}`).join(',') || '.pdf,.docx,.xlsx,.pptx,.jpg,.png'}
                     onChange={handleFileChange}
                     required
                   />
                   <p className="text-xs text-muted-foreground">
                     {settings ? (
                       <>
-                        Supported formats: {settings.allowed_file_types?.join(', ').toUpperCase() || 'PDF, DOCX, XLSX, PPTX, JPG, PNG'} 
-                        (Max {settings.max_file_size ? `${(settings.max_file_size / (1024 * 1024)).toFixed(0)}MB` : '10MB'})
+                        Supported formats: {settings.allowedFileTypes?.join(', ').toUpperCase() || 'PDF, DOCX, XLSX, PPTX, JPG, PNG'} 
+                        (Max {settings.maxFileSize ? `${(settings.maxFileSize / (1024 * 1024)).toFixed(0)}MB` : '10MB'})
                       </>
                     ) : (
                       'Supported formats: PDF, DOCX, XLSX, PPTX, JPG, PNG (Max 10MB)'

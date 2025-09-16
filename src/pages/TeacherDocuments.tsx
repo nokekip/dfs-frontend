@@ -144,22 +144,22 @@ export default function TeacherDocuments() {
     }
   };
 
+  const handlePreview = (document: Document) => {
+    setPreviewFile(document);
+    setIsPreviewOpen(true);
+  };
+
   const handleDownload = async (doc: Document) => {
     try {
-      await apiClient.downloadDocument(doc.id);
+      await apiClient.downloadDocument(doc.id, undefined, doc.fileName);
       toast.success('Download Started', {
         description: `${doc.fileName} is being downloaded`
       });
     } catch (error) {
       toast.error('Download Failed', {
-        description: 'Failed to download document. Please try again.'
+        description: 'Failed to download file. Please try again.'
       });
     }
-  };
-
-  const handlePreview = (document: Document) => {
-    setPreviewFile(document);
-    setIsPreviewOpen(true);
   };
 
   const handleShare = (document: Document) => {
@@ -623,7 +623,6 @@ export default function TeacherDocuments() {
           document={selectedDocument}
           open={shareDialogOpen}
           onOpenChange={setShareDialogOpen}
-          onShare={handleShareSubmit}
         />
 
         {/* File Preview Modal */}

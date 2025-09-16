@@ -1729,7 +1729,7 @@ export class ApiClient {
     }
   }
 
-  async downloadDocument(documentId: string, shareToken?: string): Promise<void> {
+  async downloadDocument(documentId: string, shareToken?: string, documentFileName?: string): Promise<void> {
     try {
       const token = localStorage.getItem(config.auth.tokenKey);
       if (!token) {
@@ -1752,14 +1752,31 @@ export class ApiClient {
         throw new ApiError(`HTTP error! status: ${response.status}`, response.status);
       }
 
-      // Get filename from Content-Disposition header or use a default
+      // Get filename from Content-Disposition header with improved parsing
       const contentDisposition = response.headers.get('Content-Disposition');
-      let fileName = 'download';
+      let fileName = documentFileName || 'download'; // Use provided filename as fallback
+      
       if (contentDisposition) {
-        const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (fileNameMatch && fileNameMatch[1]) {
-          fileName = fileNameMatch[1].replace(/['"]/g, '');
+        // Try multiple patterns to extract filename
+        const patterns = [
+          /filename\*=UTF-8''(.+)/i,  // RFC 5987 encoded filename
+          /filename="([^"]+)"/i,       // Quoted filename
+          /filename=([^;]+)/i          // Unquoted filename
+        ];
+        
+        for (const pattern of patterns) {
+          const match = contentDisposition.match(pattern);
+          if (match && match[1]) {
+            fileName = decodeURIComponent(match[1].trim());
+            break;
+          }
         }
+      }
+      
+      // Ensure filename has proper extension if missing
+      if (documentFileName && !fileName.includes('.') && documentFileName.includes('.')) {
+        const extension = documentFileName.split('.').pop();
+        fileName = `${fileName}.${extension}`;
       }
 
       // Create blob and download

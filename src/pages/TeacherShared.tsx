@@ -92,9 +92,11 @@ export default function TeacherShared() {
     try {
       // For shared documents, use document.document (the actual document ID)
       const documentId = document.document || document.id;
-      await apiClient.downloadDocument(documentId);
+      const fileName = document.document_file_name || document.fileName || document.document_title || document.title;
+      
+      await apiClient.downloadDocument(documentId, undefined, fileName);
       toast.success('Download Started', {
-        description: `${document.document_file_name || document.fileName || document.document_title || document.title} is being downloaded`
+        description: `${fileName} is being downloaded`
       });
     } catch (error) {
       toast.error('Download Failed', {
@@ -553,7 +555,6 @@ export default function TeacherShared() {
           document={selectedDocument}
           open={shareDialogOpen}
           onOpenChange={setShareDialogOpen}
-          onShare={handleShareSubmit}
         />
 
         {/* Revoke Access Dialog */}
